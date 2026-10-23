@@ -1,0 +1,1287 @@
+{
+  "version": "1.0.0",
+  "configType": "TABBED",
+  "description": "V1 — Futuristic SOC-focused SentinelOne Singularity Data Lake / AI SIEM dashboard for failed login monitoring, account targeting, brute-force and password-spray triage, privileged authentication failures, source/endpoint intelligence, temporal analytics, and investigation.",
+  "tabs": [
+    {
+      "tabName": "Readme",
+      "graphs": [
+        {
+          "title": "Readme",
+          "graphStyle": "markdown",
+          "markdown": "# Authentication Threat Intelligence — Failed Login Operations | V1\n\n**Mission:** transform SentinelOne `Login` telemetry into a SOC-focused authentication defense view for failed logins, brute-force triage, password-spraying discovery, privileged-account review, source/endpoint attribution, and investigation.\n\n## Core telemetry\nThe dashboard is anchored on:\n\n`event.type == \"Login\" AND event.login.loginIsSuccessful == false`\n\nThe supplied source dashboard confirms:\n- `event.type`\n- `event.login.loginIsSuccessful`\n- `event.login.userName`\n\nThis V1 also uses common SentinelOne login-event context fields for deeper triage:\n- `event.login.type`\n- `event.login.isAdministratorEquivalent`\n- `src.endpoint.ip.address`\n- `endpoint.name`\n- `site.name`\n- `agent.uuid`\n\nValidate field population in the target tenant before production rollout because login telemetry can vary by OS, agent/data-source coverage, and event source.\n\n## SOC operating model\nUse the dashboard to answer:\n1. **How much failed authentication activity is occurring?**\n2. **Which accounts are being targeted most heavily?**\n3. **Which endpoints receive the failures?**\n4. **Which source IPs are generating the activity?**\n5. **Are privileged / administrator-equivalent identities involved?**\n6. **Does one source target many accounts (password spraying)?**\n7. **Does one account receive many failures (password guessing / brute force)?**\n8. **Do the same user + source + endpoint tuples show both failures and successful logins in the selected range?**\n9. **What raw events should the analyst pivot into immediately?**\n\n## Custom triage heuristics\nThese are **NeverOff analytic heuristics**, not SentinelOne threat scores or native severity values:\n- **Brute-force candidate:** ≥ 10 failed logins against one account in the selected range.\n- **Password-spray candidate:** ≥ 10 failed logins from one source IP and ≥ 5 distinct target accounts.\n- **Burst cluster:** ≥ 5 failures for the same source IP + account + endpoint inside a 15-minute bucket.\n- **Distributed targeting:** ≥ 10 failures against one account from ≥ 3 distinct source IPs.\n- **Privileged attention:** any failure where `event.login.isAdministratorEquivalent == true`.\n\nTune thresholds to the client's authentication baseline, identity architecture, lockout policy, remote-access model, and service-account behavior.\n\n## MITRE ATT&CK alignment\nPrimary analytic alignment:\n- **T1110 — Brute Force**\n- **T1110.001 — Password Guessing**\n- **T1110.003 — Password Spraying**\n- **T1078 — Valid Accounts** for successful-authentication follow-up and compromise validation\n\n## Interpretation cautions\n- Failed logins are not inherently malicious. They may result from expired passwords, stale services, mapped drives, scheduled tasks, disconnected VPN sessions, or user error.\n- A source IP can be private, NATed, proxied, VPN-assigned, or otherwise non-geolocatable.\n- The **Failure + Success Coexistence** views are range-level correlation aids. They do **not** prove that success occurred after the failures; confirm chronology in the raw events.\n- Event counts represent observed login events, not unique human authentication sessions.\n\n## Recommended SOC workflow\n**Command Center → Spray & Brute Force → Privileged Access → Source & Endpoint → Investigation**\n\nUse the **Investigation** tab as the evidence pivot and the **Detection Engineering** tab as the starting point for converting stable patterns into alerts / STAR or correlation logic.\n\nDeveloped by the Threat Detection Engineering Division at NeverOff Technology (SentinelOne Division)\nDominican Republic",
+          "description": "",
+          "layout": {
+            "h": 42,
+            "w": 60,
+            "x": 0,
+            "y": 0
+          }
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    },
+    {
+      "tabName": "Command Center",
+      "filters": [
+        {
+          "facet": "site.name",
+          "name": "Site"
+        },
+        {
+          "facet": "endpoint.name",
+          "name": "Endpoint"
+        },
+        {
+          "facet": "event.login.userName",
+          "name": "User"
+        },
+        {
+          "facet": "event.login.type",
+          "name": "Login Type"
+        },
+        {
+          "facet": "event.login.isAdministratorEquivalent",
+          "name": "Admin Equivalent"
+        },
+        {
+          "facet": "src.endpoint.ip.address",
+          "name": "Source IP"
+        }
+      ],
+      "graphs": [
+        {
+          "title": "Failed Login Events",
+          "description": "Total failed Login telemetry in the selected time range.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false) | group FailedLogins = count()",
+          "layout": {
+            "h": 7,
+            "w": 10,
+            "x": 0,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Impacted User Accounts",
+          "description": "Distinct user names associated with failed login telemetry.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(event.login.userName)) | group Users = estimate_distinct(event.login.userName)",
+          "layout": {
+            "h": 7,
+            "w": 10,
+            "x": 10,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Impacted Endpoints",
+          "description": "Distinct protected endpoints associated with failed authentication attempts.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(endpoint.name)) | group Endpoints = estimate_distinct(endpoint.name)",
+          "layout": {
+            "h": 7,
+            "w": 10,
+            "x": 20,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Observed Source IPs",
+          "description": "Distinct source endpoint IP addresses associated with failed authentication attempts.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(src.endpoint.ip.address)) | group SourceIPs = estimate_distinct(src.endpoint.ip.address)",
+          "layout": {
+            "h": 7,
+            "w": 10,
+            "x": 30,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Admin-Equivalent Failures",
+          "description": "Failed logins where the login event is marked administrator-equivalent.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND event.login.isAdministratorEquivalent == true) | group PrivilegedFailures = count()",
+          "layout": {
+            "h": 7,
+            "w": 10,
+            "x": 40,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Login Types Observed",
+          "description": "Distinct login types represented in failed authentication telemetry.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(event.login.type)) | group LoginTypes = estimate_distinct(event.login.type)",
+          "layout": {
+            "h": 7,
+            "w": 10,
+            "x": 50,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Authentication Outcomes Over Time",
+          "description": "Failed and successful Login events over time. Success is included as context for attack progression and false-positive analysis.",
+          "graphStyle": "line",
+          "query": "| filter(event.type == \"Login\") | let AuthResult = event.login.loginIsSuccessful == true ? \"Success\" : \"Failure\" | group AuthenticationEvents = count() by timestamp = timebucket('1 hour'), AuthResult | transpose AuthResult on timestamp",
+          "layout": {
+            "h": 10,
+            "w": 60,
+            "x": 0,
+            "y": 7
+          },
+          "lineSmoothing": "straightLines",
+          "plotNulls": "gaps",
+          "xAxis": "time",
+          "yScale": "linear",
+          "valueColors": [
+            {
+              "value": "Failure",
+              "color": "#FF3B5C"
+            },
+            {
+              "value": "Success",
+              "color": "#39FF88"
+            }
+          ]
+        },
+        {
+          "title": "Authentication Outcome",
+          "description": "Distribution of successful versus failed Login telemetry.",
+          "graphStyle": "donut",
+          "dataLabelType": "PERCENTAGE",
+          "maxPieSlices": 10,
+          "query": "| filter(event.type == \"Login\") | let AuthResult = event.login.loginIsSuccessful == true ? \"Success\" : \"Failure\" | group AuthenticationEvents = count() by AuthResult | sort -AuthenticationEvents",
+          "layout": {
+            "h": 14,
+            "w": 15,
+            "x": 0,
+            "y": 17
+          }
+        },
+        {
+          "title": "Failed Logins by Login Type",
+          "description": "Distribution of failed authentication events by login type.",
+          "graphStyle": "donut",
+          "dataLabelType": "PERCENTAGE",
+          "maxPieSlices": 10,
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(event.login.type)) | group FailedLogins = count() by event.login.type | sort -FailedLogins",
+          "layout": {
+            "h": 14,
+            "w": 15,
+            "x": 15,
+            "y": 17
+          }
+        },
+        {
+          "title": "Privilege Context",
+          "description": "Administrator-equivalent versus non-administrator-equivalent failed logins.",
+          "graphStyle": "donut",
+          "dataLabelType": "PERCENTAGE",
+          "maxPieSlices": 10,
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false) | let PrivilegeContext = event.login.isAdministratorEquivalent == true ? \"Admin-Equivalent\" : \"Standard / Other\" | group FailedLogins = count() by PrivilegeContext | sort -FailedLogins",
+          "layout": {
+            "h": 14,
+            "w": 15,
+            "x": 30,
+            "y": 17
+          }
+        },
+        {
+          "title": "Top Targeted Accounts",
+          "description": "User accounts ranked by failed login volume.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(event.login.userName)) | group FailedLogins = count(), Endpoints = estimate_distinct(endpoint.name), SourceIPs = estimate_distinct(src.endpoint.ip.address) by event.login.userName | sort -FailedLogins | limit 20",
+          "layout": {
+            "h": 14,
+            "w": 15,
+            "x": 45,
+            "y": 17
+          }
+        },
+        {
+          "title": "Top Endpoints by Failed Authentication",
+          "description": "Endpoints receiving the greatest volume of failed Login telemetry.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(endpoint.name)) | group FailedLogins = count(), Users = estimate_distinct(event.login.userName), SourceIPs = estimate_distinct(src.endpoint.ip.address), LoginTypes = estimate_distinct(event.login.type) by endpoint.name, site.name | sort -FailedLogins | limit 30",
+          "layout": {
+            "h": 15,
+            "w": 30,
+            "x": 0,
+            "y": 31
+          }
+        },
+        {
+          "title": "Top Source IPs by Failed Authentication",
+          "description": "Source IP addresses generating the largest volume of failed authentication attempts.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(src.endpoint.ip.address)) | group FailedLogins = count(), Users = estimate_distinct(event.login.userName), Endpoints = estimate_distinct(endpoint.name), LoginTypes = estimate_distinct(event.login.type) by src.endpoint.ip.address | sort -FailedLogins | limit 30",
+          "layout": {
+            "h": 15,
+            "w": 30,
+            "x": 30,
+            "y": 31
+          }
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    },
+    {
+      "tabName": "Account Risk",
+      "filters": [
+        {
+          "facet": "site.name",
+          "name": "Site"
+        },
+        {
+          "facet": "endpoint.name",
+          "name": "Endpoint"
+        },
+        {
+          "facet": "event.login.userName",
+          "name": "User"
+        },
+        {
+          "facet": "event.login.type",
+          "name": "Login Type"
+        },
+        {
+          "facet": "event.login.isAdministratorEquivalent",
+          "name": "Admin Equivalent"
+        },
+        {
+          "facet": "src.endpoint.ip.address",
+          "name": "Source IP"
+        }
+      ],
+      "graphs": [
+        {
+          "title": "Account Failure Risk Ranking",
+          "description": "Ranks accounts by failed login volume and target/source breadth. High volume plus broad source/endpoint diversity warrants analyst review.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(event.login.userName)) | group FailedLogins = count(), DistinctSourceIPs = estimate_distinct(src.endpoint.ip.address), DistinctEndpoints = estimate_distinct(endpoint.name), LoginTypes = estimate_distinct(event.login.type) by event.login.userName | sort -FailedLogins | limit 100",
+          "layout": {
+            "h": 16,
+            "w": 30,
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "title": "Account × Endpoint Concentration",
+          "description": "Shows where each account is failing and how many source IPs are involved.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(event.login.userName) AND !isempty(endpoint.name)) | group FailedLogins = count(), SourceIPs = estimate_distinct(src.endpoint.ip.address), LoginTypes = estimate_distinct(event.login.type) by event.login.userName, endpoint.name, site.name | sort -FailedLogins | limit 150",
+          "layout": {
+            "h": 16,
+            "w": 30,
+            "x": 30,
+            "y": 0
+          }
+        },
+        {
+          "title": "Brute-Force Candidate Accounts",
+          "description": "Custom heuristic: accounts with at least 10 failed logins in the selected time range.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(event.login.userName)) | group FailedLogins = count(), SourceIPs = estimate_distinct(src.endpoint.ip.address), Endpoints = estimate_distinct(endpoint.name), LoginTypes = estimate_distinct(event.login.type) by event.login.userName | filter FailedLogins >= 10 | sort -FailedLogins | limit 100",
+          "layout": {
+            "h": 16,
+            "w": 60,
+            "x": 0,
+            "y": 16
+          }
+        },
+        {
+          "title": "Distributed Targeting — One Account, Multiple Sources",
+          "description": "Custom heuristic: at least 10 failures against an account from at least 3 distinct source IPs.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(event.login.userName)) | group FailedLogins = count(), SourceIPs = estimate_distinct(src.endpoint.ip.address), Endpoints = estimate_distinct(endpoint.name) by event.login.userName | filter FailedLogins >= 10 AND SourceIPs >= 3 | sort -SourceIPs, -FailedLogins | limit 100",
+          "layout": {
+            "h": 16,
+            "w": 30,
+            "x": 0,
+            "y": 32
+          }
+        },
+        {
+          "title": "Admin-Equivalent Target Accounts",
+          "description": "Accounts involved in administrator-equivalent failed authentication telemetry.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND event.login.isAdministratorEquivalent == true AND !isempty(event.login.userName)) | group FailedLogins = count(), SourceIPs = estimate_distinct(src.endpoint.ip.address), Endpoints = estimate_distinct(endpoint.name), LoginTypes = estimate_distinct(event.login.type) by event.login.userName | sort -FailedLogins | limit 100",
+          "layout": {
+            "h": 16,
+            "w": 30,
+            "x": 30,
+            "y": 32
+          }
+        },
+        {
+          "title": "Authentication Attack Path — Source → User → Endpoint",
+          "description": "Failed-authentication flow from source IP to target user account to endpoint. Use this for rapid relationship triage.",
+          "graphStyle": "sankey",
+          "sankeyColorScheme": "default",
+          "showNodeValues": "true",
+          "colorMatching": "automatic",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(event.login.userName) AND !isempty(endpoint.name)) | let srcip = !isempty(src.endpoint.ip.address) ? \"🌐 \" + src.endpoint.ip.address : \"🌐 Unknown Source\" | let user = \"👤 \" + event.login.userName | let host = \"💻 \" + endpoint.name | group c = count() by srcip, user, host | sort -c | limit 100 | let link = array(0,1,2).expand() | let source = link == 0 ? \"🔐 Failed Authentication\" : link == 1 ? srcip : user | let target = link == 0 ? srcip : link == 1 ? user : host | group c = sum(c) by source, target | columns source, target, c",
+          "layout": {
+            "h": 18,
+            "w": 60,
+            "x": 0,
+            "y": 48
+          }
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    },
+    {
+      "tabName": "Source & Endpoint",
+      "filters": [
+        {
+          "facet": "site.name",
+          "name": "Site"
+        },
+        {
+          "facet": "endpoint.name",
+          "name": "Endpoint"
+        },
+        {
+          "facet": "event.login.userName",
+          "name": "User"
+        },
+        {
+          "facet": "event.login.type",
+          "name": "Login Type"
+        },
+        {
+          "facet": "event.login.isAdministratorEquivalent",
+          "name": "Admin Equivalent"
+        },
+        {
+          "facet": "src.endpoint.ip.address",
+          "name": "Source IP"
+        }
+      ],
+      "graphs": [
+        {
+          "title": "Source IP Threat Surface Ranking",
+          "description": "Ranks authentication sources by failure volume, target-account breadth, and endpoint breadth.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(src.endpoint.ip.address)) | group FailedLogins = count(), TargetUsers = estimate_distinct(event.login.userName), TargetEndpoints = estimate_distinct(endpoint.name), LoginTypes = estimate_distinct(event.login.type) by src.endpoint.ip.address | sort -FailedLogins | limit 100",
+          "layout": {
+            "h": 16,
+            "w": 30,
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "title": "Endpoint Authentication Exposure",
+          "description": "Ranks endpoints by failed login volume and breadth of users/source IPs.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(endpoint.name)) | group FailedLogins = count(), Users = estimate_distinct(event.login.userName), SourceIPs = estimate_distinct(src.endpoint.ip.address), LoginTypes = array_agg_distinct(event.login.type) by endpoint.name, site.name | let LoginTypeList = array_to_string(LoginTypes, \", \") | columns endpoint.name, site.name, Users, SourceIPs, LoginTypeList, FailedLogins | sort -FailedLogins | limit 100",
+          "layout": {
+            "h": 16,
+            "w": 30,
+            "x": 30,
+            "y": 0
+          }
+        },
+        {
+          "title": "Public Source Geography",
+          "description": "Geolocates public source IPs when possible. Private/NAT/VPN addresses can remain unattributed.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(src.endpoint.ip.address)) | let SourceCountry = geo_ip_country(src.endpoint.ip.address) | filter !isempty(SourceCountry) | group FailedLogins = count(), SourceIPs = estimate_distinct(src.endpoint.ip.address), Users = estimate_distinct(event.login.userName), Endpoints = estimate_distinct(endpoint.name) by SourceCountry | sort -FailedLogins | limit 50",
+          "layout": {
+            "h": 16,
+            "w": 30,
+            "x": 0,
+            "y": 16
+          }
+        },
+        {
+          "title": "Login Type × Source IP",
+          "description": "Associates source IPs with the login types producing failures.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(src.endpoint.ip.address) AND !isempty(event.login.type)) | group FailedLogins = count(), Users = estimate_distinct(event.login.userName), Endpoints = estimate_distinct(endpoint.name) by src.endpoint.ip.address, event.login.type | sort -FailedLogins | limit 150",
+          "layout": {
+            "h": 16,
+            "w": 30,
+            "x": 30,
+            "y": 16
+          }
+        },
+        {
+          "title": "Source IP → User → Endpoint Flow",
+          "description": "Relationship graph for failed authentication paths without a synthetic root node.",
+          "graphStyle": "sankey",
+          "sankeyColorScheme": "default",
+          "showNodeValues": "true",
+          "colorMatching": "automatic",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(event.login.userName) AND !isempty(endpoint.name)) | let srcip = !isempty(src.endpoint.ip.address) ? \"🌐 \" + src.endpoint.ip.address : \"🌐 Unknown Source\" | let user = \"👤 \" + event.login.userName | let host = \"💻 \" + endpoint.name | group c = count() by srcip, user, host | sort -c | limit 100 | let link = array(0,1).expand() | let source = link == 0 ? srcip : user | let target = link == 0 ? user : host | group c = sum(c) by source, target | columns source, target, c",
+          "layout": {
+            "h": 18,
+            "w": 60,
+            "x": 0,
+            "y": 32
+          }
+        },
+        {
+          "title": "Source & Endpoint Event Detail",
+          "description": "Raw failed authentication evidence with source IP, user, login type, privilege context, site, endpoint, and agent identifiers.",
+          "graphStyle": "",
+          "showBarsColumn": "false",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false) | columns event.time, event.id, event.type, site.id, site.name, agent.uuid, endpoint.name, event.login.userName, event.login.type, event.login.isAdministratorEquivalent, event.login.loginIsSuccessful, src.endpoint.ip.address | sort -event.time | limit 1000",
+          "layout": {
+            "h": 22,
+            "w": 60,
+            "x": 0,
+            "y": 50
+          }
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    },
+    {
+      "tabName": "Spray & Brute Force",
+      "filters": [
+        {
+          "facet": "site.name",
+          "name": "Site"
+        },
+        {
+          "facet": "endpoint.name",
+          "name": "Endpoint"
+        },
+        {
+          "facet": "event.login.userName",
+          "name": "User"
+        },
+        {
+          "facet": "event.login.type",
+          "name": "Login Type"
+        },
+        {
+          "facet": "event.login.isAdministratorEquivalent",
+          "name": "Admin Equivalent"
+        },
+        {
+          "facet": "src.endpoint.ip.address",
+          "name": "Source IP"
+        }
+      ],
+      "graphs": [
+        {
+          "title": "Spray Candidate Sources",
+          "description": "Custom heuristic count: source IPs with ≥10 failures across ≥5 distinct users.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(src.endpoint.ip.address)) | group FailedLogins = count(), Users = estimate_distinct(event.login.userName) by src.endpoint.ip.address | filter FailedLogins >= 10 AND Users >= 5 | group CandidateSources = count()",
+          "layout": {
+            "h": 7,
+            "w": 15,
+            "x": 0,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Brute-Force Candidate Accounts",
+          "description": "Custom heuristic count: user accounts with ≥10 failed logins.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(event.login.userName)) | group FailedLogins = count() by event.login.userName | filter FailedLogins >= 10 | group CandidateAccounts = count()",
+          "layout": {
+            "h": 7,
+            "w": 15,
+            "x": 15,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "15-Minute Burst Clusters",
+          "description": "Custom heuristic count: ≥5 failures for a source IP + user + endpoint in a 15-minute bucket.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(event.login.userName) AND !isempty(endpoint.name)) | group FailedLogins = count() by Bucket = timebucket('15 minutes'), src.endpoint.ip.address, event.login.userName, endpoint.name | filter FailedLogins >= 5 | group BurstClusters = count()",
+          "layout": {
+            "h": 7,
+            "w": 15,
+            "x": 30,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Distributed Target Accounts",
+          "description": "Custom heuristic count: ≥10 failures against one account from ≥3 distinct source IPs.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(event.login.userName)) | group FailedLogins = count(), SourceIPs = estimate_distinct(src.endpoint.ip.address) by event.login.userName | filter FailedLogins >= 10 AND SourceIPs >= 3 | group DistributedTargets = count()",
+          "layout": {
+            "h": 7,
+            "w": 15,
+            "x": 45,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Password Spray Candidates",
+          "description": "One source IP targeting many accounts. Threshold: ≥10 total failures and ≥5 distinct target users.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(src.endpoint.ip.address)) | group FailedLogins = count(), TargetUsers = estimate_distinct(event.login.userName), TargetEndpoints = estimate_distinct(endpoint.name), LoginTypes = estimate_distinct(event.login.type) by src.endpoint.ip.address | filter FailedLogins >= 10 AND TargetUsers >= 5 | sort -TargetUsers, -FailedLogins | limit 100",
+          "layout": {
+            "h": 18,
+            "w": 30,
+            "x": 0,
+            "y": 7
+          }
+        },
+        {
+          "title": "Brute-Force / Password Guessing Candidates",
+          "description": "One account receiving repeated failures. Threshold: ≥10 failed logins.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(event.login.userName)) | group FailedLogins = count(), SourceIPs = estimate_distinct(src.endpoint.ip.address), Endpoints = estimate_distinct(endpoint.name), LoginTypes = estimate_distinct(event.login.type) by event.login.userName | filter FailedLogins >= 10 | sort -FailedLogins | limit 100",
+          "layout": {
+            "h": 18,
+            "w": 30,
+            "x": 30,
+            "y": 7
+          }
+        },
+        {
+          "title": "15-Minute Authentication Burst Clusters",
+          "description": "Clusters repeated failures for the same source IP, account, and endpoint into 15-minute windows.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(event.login.userName) AND !isempty(endpoint.name)) | group FailedLogins = count() by Bucket = timebucket('15 minutes'), src.endpoint.ip.address, event.login.userName, endpoint.name, event.login.type | filter FailedLogins >= 5 | sort -Bucket, -FailedLogins | limit 200",
+          "layout": {
+            "h": 18,
+            "w": 60,
+            "x": 0,
+            "y": 25
+          }
+        },
+        {
+          "title": "Target Breadth by Source IP",
+          "description": "Shows whether a source is concentrated on one account or spreading across many identities/endpoints.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(src.endpoint.ip.address)) | group FailedLogins = count(), TargetUsers = estimate_distinct(event.login.userName), TargetEndpoints = estimate_distinct(endpoint.name), AdminEquivalentFailures = sum(event.login.isAdministratorEquivalent == true ? 1 : 0) by src.endpoint.ip.address | sort -TargetUsers, -FailedLogins | limit 100",
+          "layout": {
+            "h": 16,
+            "w": 30,
+            "x": 0,
+            "y": 43
+          }
+        },
+        {
+          "title": "Distributed Attack Candidates",
+          "description": "Accounts receiving failures from multiple source IPs. Useful for distributed spraying, credential testing, or broad remote-access abuse.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(event.login.userName)) | group FailedLogins = count(), SourceIPs = estimate_distinct(src.endpoint.ip.address), Endpoints = estimate_distinct(endpoint.name) by event.login.userName | filter FailedLogins >= 10 AND SourceIPs >= 3 | sort -SourceIPs, -FailedLogins | limit 100",
+          "layout": {
+            "h": 16,
+            "w": 30,
+            "x": 30,
+            "y": 43
+          }
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    },
+    {
+      "tabName": "Privileged Access",
+      "filters": [
+        {
+          "facet": "site.name",
+          "name": "Site"
+        },
+        {
+          "facet": "endpoint.name",
+          "name": "Endpoint"
+        },
+        {
+          "facet": "event.login.userName",
+          "name": "User"
+        },
+        {
+          "facet": "event.login.type",
+          "name": "Login Type"
+        },
+        {
+          "facet": "event.login.isAdministratorEquivalent",
+          "name": "Admin Equivalent"
+        },
+        {
+          "facet": "src.endpoint.ip.address",
+          "name": "Source IP"
+        }
+      ],
+      "graphs": [
+        {
+          "title": "Admin-Equivalent Failed Logins",
+          "description": "Total administrator-equivalent failed login events.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND event.login.isAdministratorEquivalent == true) | group FailedLogins = count()",
+          "layout": {
+            "h": 7,
+            "w": 15,
+            "x": 0,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Privileged Target Accounts",
+          "description": "Distinct user names involved in administrator-equivalent failed logins.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND event.login.isAdministratorEquivalent == true AND !isempty(event.login.userName)) | group Users = estimate_distinct(event.login.userName)",
+          "layout": {
+            "h": 7,
+            "w": 15,
+            "x": 15,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Privileged Target Endpoints",
+          "description": "Distinct endpoints associated with administrator-equivalent failed logins.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND event.login.isAdministratorEquivalent == true AND !isempty(endpoint.name)) | group Endpoints = estimate_distinct(endpoint.name)",
+          "layout": {
+            "h": 7,
+            "w": 15,
+            "x": 30,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Privileged Source IPs",
+          "description": "Distinct source IPs associated with administrator-equivalent failed logins.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND event.login.isAdministratorEquivalent == true AND !isempty(src.endpoint.ip.address)) | group SourceIPs = estimate_distinct(src.endpoint.ip.address)",
+          "layout": {
+            "h": 7,
+            "w": 15,
+            "x": 45,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Privileged Accounts Under Authentication Pressure",
+          "description": "Administrator-equivalent accounts ranked by failure volume and source/endpoint breadth.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND event.login.isAdministratorEquivalent == true AND !isempty(event.login.userName)) | group FailedLogins = count(), SourceIPs = estimate_distinct(src.endpoint.ip.address), Endpoints = estimate_distinct(endpoint.name), LoginTypes = estimate_distinct(event.login.type) by event.login.userName | sort -FailedLogins | limit 100",
+          "layout": {
+            "h": 16,
+            "w": 30,
+            "x": 0,
+            "y": 7
+          }
+        },
+        {
+          "title": "Privileged Failure Sources",
+          "description": "Source IPs generating administrator-equivalent failed login activity.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND event.login.isAdministratorEquivalent == true AND !isempty(src.endpoint.ip.address)) | group FailedLogins = count(), Users = estimate_distinct(event.login.userName), Endpoints = estimate_distinct(endpoint.name), LoginTypes = estimate_distinct(event.login.type) by src.endpoint.ip.address | sort -FailedLogins | limit 100",
+          "layout": {
+            "h": 16,
+            "w": 30,
+            "x": 30,
+            "y": 7
+          }
+        },
+        {
+          "title": "Privileged Failure Login Types",
+          "description": "Login-type distribution for administrator-equivalent failed authentication.",
+          "graphStyle": "donut",
+          "dataLabelType": "PERCENTAGE",
+          "maxPieSlices": 15,
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND event.login.isAdministratorEquivalent == true AND !isempty(event.login.type)) | group FailedLogins = count() by event.login.type | sort -FailedLogins",
+          "layout": {
+            "h": 15,
+            "w": 20,
+            "x": 0,
+            "y": 23
+          }
+        },
+        {
+          "title": "Privileged Endpoints",
+          "description": "Endpoints associated with administrator-equivalent failed authentication.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND event.login.isAdministratorEquivalent == true AND !isempty(endpoint.name)) | group FailedLogins = count(), Users = estimate_distinct(event.login.userName), SourceIPs = estimate_distinct(src.endpoint.ip.address) by endpoint.name, site.name | sort -FailedLogins | limit 100",
+          "layout": {
+            "h": 15,
+            "w": 20,
+            "x": 20,
+            "y": 23
+          }
+        },
+        {
+          "title": "Privileged Public Source Geography",
+          "description": "Public source-country enrichment for administrator-equivalent failures where geolocation is available.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND event.login.isAdministratorEquivalent == true AND !isempty(src.endpoint.ip.address)) | let SourceCountry = geo_ip_country(src.endpoint.ip.address) | filter !isempty(SourceCountry) | group FailedLogins = count(), SourceIPs = estimate_distinct(src.endpoint.ip.address), Users = estimate_distinct(event.login.userName) by SourceCountry | sort -FailedLogins | limit 50",
+          "layout": {
+            "h": 15,
+            "w": 20,
+            "x": 40,
+            "y": 23
+          }
+        },
+        {
+          "title": "Privileged Authentication Flow — Source → User → Endpoint",
+          "description": "Administrator-equivalent failed authentication relationship graph.",
+          "graphStyle": "sankey",
+          "sankeyColorScheme": "default",
+          "showNodeValues": "true",
+          "colorMatching": "automatic",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND event.login.isAdministratorEquivalent == true AND !isempty(event.login.userName) AND !isempty(endpoint.name)) | let srcip = !isempty(src.endpoint.ip.address) ? \"🌐 \" + src.endpoint.ip.address : \"🌐 Unknown Source\" | let user = \"👑 \" + event.login.userName | let host = \"💻 \" + endpoint.name | group c = count() by srcip, user, host | sort -c | limit 100 | let link = array(0,1,2).expand() | let source = link == 0 ? \"🔴 Privileged Failures\" : link == 1 ? srcip : user | let target = link == 0 ? srcip : link == 1 ? user : host | group c = sum(c) by source, target | columns source, target, c",
+          "layout": {
+            "h": 18,
+            "w": 60,
+            "x": 0,
+            "y": 38
+          }
+        },
+        {
+          "title": "Raw Privileged Failed Login Events",
+          "description": "Detailed administrator-equivalent failed authentication events for evidence and pivoting.",
+          "graphStyle": "",
+          "showBarsColumn": "false",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND event.login.isAdministratorEquivalent == true) | columns event.time, event.id, site.id, site.name, agent.uuid, endpoint.name, event.login.userName, event.login.type, event.login.isAdministratorEquivalent, event.login.loginIsSuccessful, src.endpoint.ip.address | sort -event.time | limit 1000",
+          "layout": {
+            "h": 22,
+            "w": 60,
+            "x": 0,
+            "y": 56
+          }
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    },
+    {
+      "tabName": "Temporal Analytics",
+      "filters": [
+        {
+          "facet": "site.name",
+          "name": "Site"
+        },
+        {
+          "facet": "endpoint.name",
+          "name": "Endpoint"
+        },
+        {
+          "facet": "event.login.userName",
+          "name": "User"
+        },
+        {
+          "facet": "event.login.type",
+          "name": "Login Type"
+        },
+        {
+          "facet": "event.login.isAdministratorEquivalent",
+          "name": "Admin Equivalent"
+        },
+        {
+          "facet": "src.endpoint.ip.address",
+          "name": "Source IP"
+        }
+      ],
+      "graphs": [
+        {
+          "title": "Failed Login Velocity — 1 Hour",
+          "description": "Hourly failed-login volume across the selected time range.",
+          "graphStyle": "line",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false) | group FailedLogins = count() by timestamp = timebucket('1 hour') | sort timestamp",
+          "layout": {
+            "h": 12,
+            "w": 60,
+            "x": 0,
+            "y": 0
+          },
+          "lineSmoothing": "straightLines",
+          "plotNulls": "gaps",
+          "xAxis": "time",
+          "yScale": "linear",
+          "valueColors": [
+            {
+              "value": "FailedLogins",
+              "color": "#FF3B5C"
+            }
+          ]
+        },
+        {
+          "title": "Failed Login Velocity — 15 Minutes",
+          "description": "Higher-resolution view for detecting short authentication bursts.",
+          "graphStyle": "line",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false) | group FailedLogins = count() by timestamp = timebucket('15 minutes') | sort timestamp",
+          "layout": {
+            "h": 12,
+            "w": 60,
+            "x": 0,
+            "y": 12
+          },
+          "lineSmoothing": "straightLines",
+          "plotNulls": "gaps",
+          "xAxis": "time",
+          "yScale": "linear",
+          "valueColors": [
+            {
+              "value": "FailedLogins",
+              "color": "#FF3B5C"
+            }
+          ]
+        },
+        {
+          "title": "Failed Logins by Hour of Day",
+          "description": "Hour-of-day distribution using the event timestamp. Use as a behavioral baseline; timezone follows the event/time interpretation in the tenant.",
+          "graphStyle": "stacked_bar",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false) | let Hour = strftime(event.time, '%H') | group FailedLogins = count() by Hour | sort Hour",
+          "xAxis": "grouped_data",
+          "yScale": "linear",
+          "numBars": "24",
+          "layout": {
+            "h": 16,
+            "w": 30,
+            "x": 0,
+            "y": 24
+          }
+        },
+        {
+          "title": "Failed Logins by Day of Week",
+          "description": "Day-of-week distribution of failed authentication activity.",
+          "graphStyle": "stacked_bar",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false) | let DayOfWeek = strftime(event.time, '%A') | group FailedLogins = count() by DayOfWeek | sort -FailedLogins",
+          "xAxis": "grouped_data",
+          "yScale": "linear",
+          "numBars": "7",
+          "layout": {
+            "h": 16,
+            "w": 30,
+            "x": 30,
+            "y": 24
+          }
+        },
+        {
+          "title": "High-Density 15-Minute Windows",
+          "description": "Time buckets with unusually concentrated failed authentication volume. Ranked by total failures; tune to the environment baseline.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false) | group FailedLogins = count(), Users = estimate_distinct(event.login.userName), SourceIPs = estimate_distinct(src.endpoint.ip.address), Endpoints = estimate_distinct(endpoint.name) by Bucket = timebucket('15 minutes') | filter FailedLogins >= 20 | sort -FailedLogins | limit 200",
+          "layout": {
+            "h": 18,
+            "w": 30,
+            "x": 0,
+            "y": 40
+          }
+        },
+        {
+          "title": "Per-Identity Burst Windows",
+          "description": "Same-user/source/endpoint failure bursts within 15-minute buckets.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(event.login.userName) AND !isempty(endpoint.name)) | group FailedLogins = count() by Bucket = timebucket('15 minutes'), event.login.userName, src.endpoint.ip.address, endpoint.name, event.login.type | filter FailedLogins >= 5 | sort -Bucket, -FailedLogins | limit 300",
+          "layout": {
+            "h": 18,
+            "w": 30,
+            "x": 30,
+            "y": 40
+          }
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    },
+    {
+      "tabName": "Investigation",
+      "filters": [
+        {
+          "facet": "site.name",
+          "name": "Site"
+        },
+        {
+          "facet": "endpoint.name",
+          "name": "Endpoint"
+        },
+        {
+          "facet": "event.login.userName",
+          "name": "User"
+        },
+        {
+          "facet": "event.login.type",
+          "name": "Login Type"
+        },
+        {
+          "facet": "event.login.isAdministratorEquivalent",
+          "name": "Admin Equivalent"
+        },
+        {
+          "facet": "src.endpoint.ip.address",
+          "name": "Source IP"
+        }
+      ],
+      "graphs": [
+        {
+          "title": "Unified Failed Login Investigation Table",
+          "description": "Primary evidence table for failed authentication investigations.",
+          "graphStyle": "",
+          "showBarsColumn": "false",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false) | columns event.time, event.id, event.type, site.id, site.name, agent.uuid, endpoint.name, event.login.userName, event.login.type, event.login.isAdministratorEquivalent, event.login.loginIsSuccessful, src.endpoint.ip.address | sort -event.time | limit 1000",
+          "layout": {
+            "h": 24,
+            "w": 60,
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "title": "User + Source + Endpoint Pivot",
+          "description": "Aggregated investigation pivot for high-volume authentication tuples.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false) | group FailedLogins = count(), LoginTypes = array_agg_distinct(event.login.type) by event.login.userName, src.endpoint.ip.address, endpoint.name, site.name, event.login.isAdministratorEquivalent | let LoginTypeList = array_to_string(LoginTypes, \", \") | columns event.login.userName, src.endpoint.ip.address, endpoint.name, site.name, event.login.isAdministratorEquivalent, LoginTypeList, FailedLogins | sort -FailedLogins | limit 500",
+          "layout": {
+            "h": 20,
+            "w": 30,
+            "x": 0,
+            "y": 24
+          }
+        },
+        {
+          "title": "Failure + Success Coexistence",
+          "description": "Same user/source/endpoint tuple has both failed and successful Login events in the selected range. This is a triage signal, not proof of chronological fail-then-success.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"Login\" AND !isempty(event.login.userName) AND !isempty(endpoint.name)) | let FailureFlag = event.login.loginIsSuccessful == false ? 1 : 0 | let SuccessFlag = event.login.loginIsSuccessful == true ? 1 : 0 | group FailedLogins = sum(FailureFlag), SuccessfulLogins = sum(SuccessFlag), FirstSeen = min(event.time), LastSeen = max(event.time) by event.login.userName, src.endpoint.ip.address, endpoint.name, site.name | filter FailedLogins > 0 AND SuccessfulLogins > 0 | sort -FailedLogins, -SuccessfulLogins | limit 300",
+          "layout": {
+            "h": 20,
+            "w": 30,
+            "x": 30,
+            "y": 24
+          }
+        },
+        {
+          "title": "All Login Events — Chronology Pivot",
+          "description": "Successful and failed Login events together for chronology confirmation.",
+          "graphStyle": "",
+          "showBarsColumn": "false",
+          "query": "| filter(event.type == \"Login\") | columns event.time, event.id, site.name, agent.uuid, endpoint.name, event.login.userName, event.login.type, event.login.isAdministratorEquivalent, event.login.loginIsSuccessful, src.endpoint.ip.address | sort -event.time | limit 1000",
+          "layout": {
+            "h": 24,
+            "w": 60,
+            "x": 0,
+            "y": 44
+          }
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    },
+    {
+      "tabName": "Detection Engineering",
+      "graphs": [
+        {
+          "title": "Detection Engineering Guide",
+          "graphStyle": "markdown",
+          "markdown": "# Detection Engineering — Authentication Analytics\n\nThis tab documents the hunting logic used by the dashboard so stable patterns can be promoted into operational alerting.\n\n## Base failed-login hunt\n`| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false)`\n\n## High-volume account / password guessing\n`| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(event.login.userName)) | group FailedLogins = count(), SourceIPs = estimate_distinct(src.endpoint.ip.address), Endpoints = estimate_distinct(endpoint.name) by event.login.userName | filter FailedLogins >= 10 | sort -FailedLogins`\n\n**Use case:** repeated authentication failures against one account.  \n**ATT&CK:** T1110 / T1110.001.\n\n## Password-spray candidate\n`| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(src.endpoint.ip.address)) | group FailedLogins = count(), TargetUsers = estimate_distinct(event.login.userName), TargetEndpoints = estimate_distinct(endpoint.name) by src.endpoint.ip.address | filter FailedLogins >= 10 AND TargetUsers >= 5 | sort -TargetUsers, -FailedLogins`\n\n**Use case:** one source IP testing credentials across many identities.  \n**ATT&CK:** T1110.003.\n\n## Privileged failed authentication\n`| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND event.login.isAdministratorEquivalent == true)`\n\n**Use case:** prioritize failed authentication involving administrator-equivalent context.\n\n## 15-minute burst\n`| filter(event.type == \"Login\" AND event.login.loginIsSuccessful == false AND !isempty(event.login.userName) AND !isempty(endpoint.name)) | group FailedLogins = count() by Bucket = timebucket('15 minutes'), src.endpoint.ip.address, event.login.userName, endpoint.name | filter FailedLogins >= 5 | sort -Bucket, -FailedLogins`\n\n**Use case:** short, high-velocity password guessing.\n\n## Failure + success coexistence\n`| filter(event.type == \"Login\" AND !isempty(event.login.userName) AND !isempty(endpoint.name)) | let FailureFlag = event.login.loginIsSuccessful == false ? 1 : 0 | let SuccessFlag = event.login.loginIsSuccessful == true ? 1 : 0 | group FailedLogins = sum(FailureFlag), SuccessfulLogins = sum(SuccessFlag) by event.login.userName, src.endpoint.ip.address, endpoint.name | filter FailedLogins > 0 AND SuccessfulLogins > 0 | sort -FailedLogins`\n\n**Use case:** triage accounts where failed and successful authentication appear in the same selected time range.  \n**ATT&CK follow-up:** T1078.  \n**Important:** confirm chronology in raw events before classifying as successful compromise.\n\n## Production tuning recommendations\n- Start with the dashboard heuristics as **visibility thresholds**, not automatic containment thresholds.\n- Baseline service accounts, scheduled tasks, jump hosts, VPN concentrators, RMM tools, and identity infrastructure.\n- Increase severity when failed-login bursts involve privileged identities, many endpoints, multiple source IPs, or a subsequent successful login.\n- Exclude only well-understood, documented benign patterns.\n- Convert validated use cases into alerting / correlation logic after observing production behavior.\n",
+          "description": "Hunting queries, heuristic thresholds, MITRE alignment, and tuning guidance for authentication detections.",
+          "layout": {
+            "h": 42,
+            "w": 60,
+            "x": 0,
+            "y": 0
+          }
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    }
+  ]
+}

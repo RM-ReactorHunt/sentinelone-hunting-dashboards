@@ -1,0 +1,10 @@
+metadata_details:
+  data_dependencies: 'SentinelOne Login events; failed and successful authentication context'
+  required_fields: 'event.type, event.time, event.id, event.login.loginIsSuccessful, event.login.userName, event.login.type, event.login.isAdministratorEquivalent, src.endpoint.ip.address, endpoint.name, site.name, site.id, agent.uuid'
+  description: 'Failed login triage, account targeting, password-spray and brute-force candidates, privileged access, and investigation. Failure/success coexistence is not chronological proof.'
+  usecase_type: 'Security'
+  usecase_action: 'Dashboard'
+  tags: 'sentinelone, threat-hunting, authentication, brute-force, password-spray'
+  version: 'v1.0'
+  author: 'NeverOff Technology — Threat Detection Engineering Division; community maintainer RM-ReactorHunt'
+  validation_status: 'Static validation only; tenant import and query execution not independently verified for this release.'
