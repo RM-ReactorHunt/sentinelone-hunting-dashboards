@@ -1,0 +1,10 @@
+metadata_details:
+  data_dependencies: 'SentinelOne endpoint telemetry: event.type == "Process Creation" and event.category == "file"'
+  required_fields: 'event.type, event.category, event.time, site.name, endpoint.name, endpoint.os, src.process.name, src.process.cmdline, src.process.user, tgt.process.name, tgt.process.cmdline, tgt.process.image.path, tgt.process.image.sha256, tgt.process.image.origin.locationPath, tgt.process.publisher, tgt.process.signedStatus, tgt.process.storyline.id, tgt.file.name, tgt.file.path, tgt.file.extension, tgt.file.sha256, tgt.file.publisher, tgt.file.isSigned, tgt.file.size, tgt.file.origin.locationPath'
+  description: 'PUA, shadow software, offensive tooling, data movement, execution origins, and investigation. Exact-name catalogs and custom priority models require tuning.'
+  usecase_type: 'Security'
+  usecase_action: 'Dashboard'
+  tags: 'sentinelone, threat-hunting, application-risk, pua, shadow-software'
+  version: 'v1.0'
+  author: 'NeverOff Technology — Threat Detection Engineering Division; community maintainer RM-ReactorHunt'
+  validation_status: 'Static validation only; tenant import and query execution not independently verified for this release.'
