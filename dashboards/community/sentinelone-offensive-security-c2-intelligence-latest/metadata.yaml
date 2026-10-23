@@ -1,0 +1,10 @@
+metadata_details:
+  data_dependencies: 'SentinelOne Process Creation, IP Connect, and threat_intelligence_indicators events; populated process and Storyline context'
+  required_fields: 'event.type, event.category, event.time, event.id, event.network.connectionStatus, event.network.direction, event.network.protocolName, src.ip.address, src.port.number, dst.ip.address, dst.port.number, src.process.name, src.process.cmdline, src.process.image.path, src.process.publisher, src.process.storyline.id, src.process.user, tgt.process.name, tgt.process.cmdline, tgt.process.image.path, tgt.process.image.sha256, tgt.process.publisher, tgt.process.signedStatus, tgt.process.storyline.id, endpoint.name, endpoint.os, site.name, tiIndicator.value, tiIndicator.malwareNames'
+  description: 'RedEye-inspired endpoint investigation of offensive tools, C2 candidates, process lineage, command timelines, Storyline, and network context. Does not import RedEye code or identify C2 operators.'
+  usecase_type: 'Security'
+  usecase_action: 'Dashboard'
+  tags: 'sentinelone, threat-hunting, offensive-tooling, c2, storyline, investigation'
+  version: 'v1.0'
+  author: 'NeverOff Technology — Threat Detection Engineering Division; community maintainer RM-ReactorHunt'
+  validation_status: 'Static validation only; tenant import and query execution not independently verified for this release.'
