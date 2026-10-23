@@ -1,0 +1,10 @@
+metadata_details:
+  data_dependencies: 'SentinelOne DNS events (event.category == "dns") and threat_intelligence_indicators events for the Threat Intelligence tab'
+  required_fields: 'event.category, event.time, event.id, event.dns.request, event.dns.response, event.dns.responseCode, event.dns.protocol, event.dns.transportProtocol, event.dns.provider, src.process.dnsCount, src.process.name, src.process.user, src.process.cmdline, src.process.image.path, src.process.storyline.id, endpoint.name, endpoint.os, site.name, agent.uuid, tiIndicator.value, tiIndicator.type, tiIndicator.source, tiIndicator.malwareNames, tiIndicator.threatActors, event.externalThreatValue'
+  description: 'DNS C2 hunting, NXDOMAIN analysis, DGA and tunneling candidates, infrastructure watchlists, and parallel TI context. Includes the supplied v1.1 matches-operator compatibility revision.'
+  usecase_type: 'Security'
+  usecase_action: 'Dashboard'
+  tags: 'sentinelone, threat-hunting, dns, c2, anomaly, threat-intelligence'
+  version: 'v1.1'
+  author: 'NeverOff Technology — Threat Detection Engineering Division; community maintainer RM-ReactorHunt'
+  validation_status: 'Static validation only; tenant import and query execution not independently verified for this release.'

@@ -1,0 +1,2430 @@
+{
+  "version": "1.0.0",
+  "configType": "TABBED",
+  "description": "NeverOff V1 — Advanced SentinelOne Singularity Data Lake / AI SIEM dashboard for DNS threat intelligence, command-and-control hunting, NXDOMAIN analysis, DGA/domain anomalies, DNS tunneling/exfiltration candidates, dual-use infrastructure monitoring, endpoint/process attribution, and detection engineering. Compatibility revision 1.1: dashboard Event Search regex operator corrected from regexp to matches.",
+  "tabs": [
+    {
+      "tabName": "Readme",
+      "graphs": [
+        {
+          "title": "Readme",
+          "graphStyle": "markdown",
+          "markdown": "# DNS Threat Intelligence, C2 & Anomaly Intelligence | NeverOff V1\n\n**Mission:** turn SentinelOne DNS telemetry into an analyst-focused hunting plane for DNS-based command-and-control, domain-generation behavior, tunneling/exfiltration candidates, anomalous resolution patterns, abuse-prone infrastructure, Threat Intelligence hits, and endpoint/process attribution.\n\n## Native telemetry used\nThe dashboard is centered on `event.category == \"dns\"` and uses fields confirmed in the current SentinelOne field catalog:\n\n- `event.dns.request` — requested domain.\n- `event.dns.response` — DNS response data.\n- `event.dns.responseCode` — numeric DNS response code.\n- `event.dns.protocol` — DNS protocol value.\n- `event.dns.transportProtocol` — DNS transport protocol.\n- `event.dns.provider` — telemetry provider.\n- `src.process.dnsCount` — DNS request count associated with the source process.\n- `endpoint.name`, `endpoint.os`, `site.name`, `src.process.name`, `src.process.user`.\n\nThe dashboard also uses common SentinelOne process context such as `src.process.cmdline`, `src.process.image.path`, and `src.process.storyline.id` in investigation views. Validate population in the target tenant before production rollout.\n\n## Threat Intelligence context\nThe **Threat Intelligence** tab consumes native `threat_intelligence_indicators` events and the current TI fields already used in SentinelOne dashboard content:\n`tiIndicator.value`, `tiIndicator.type`, `tiIndicator.source`, `tiIndicator.malwareNames`, `tiIndicator.threatActors`, and `event.externalThreatValue`.\n\nThreat Intelligence events are a parallel enrichment signal. They are not a literal SQL-style join between a DNS event and an IOC event. Validate endpoint, process, value, timeline, and Storyline context during investigation.\n\n## NeverOff DNS analytic heuristics\nThese are **triage heuristics, not SentinelOne threat scores**.\n\n- **NXDOMAIN / resolution-failure focus:** DNS response code `3` is treated as NXDOMAIN.\n- **Long request candidate:** request length `>= 80`.\n- **Very long request candidate:** request length `>= 120`.\n- **Encoded-like label candidate:** long hexadecimal or Base32-like DNS labels.\n- **Deep-label candidate:** six or more labels in a DNS name.\n- **Burst candidate:** `>= 100` DNS events from the same endpoint/process in a 5-minute bucket.\n- **High-unique-domain candidate:** `>= 50` distinct requested domains from the same endpoint/process in a 15-minute bucket.\n- **High process DNS count:** `src.process.dnsCount >= 300`.\n- **High-abuse TLD watchlist:** `.xyz, .top, .pw, .gq, .ga, .cf, .tk`.\n- **Extended elevated-monitoring TLD set:** `.click, .work, .site, .online, .live, .icu, .buzz, .cam, .cyou, .monster, .quest, .sbs`.\n- **Dual-use infrastructure:** Dynamic DNS, tunneling/relay services, public paste/CDN/file-transfer services, and encrypted-DNS resolver domains.\n\nAll thresholds should be tuned to the client's DNS architecture, recursive resolvers, VPN/proxy model, endpoint role, software inventory, and normal SaaS behavior.\n\n## Important interpretation cautions\n- DNS telemetry is **not packet inspection** and does not expose full application-layer payload semantics.\n- Long or encoded-looking DNS names are common in legitimate CDN, tracking, EDR, identity, cloud, telemetry, and security products.\n- Dynamic DNS, public tunnels, Discord/GitHub/CDN infrastructure, and DoH resolvers are legitimate technologies that are also abused by adversaries.\n- A DNS lookup alone does not prove successful network communication or C2.\n- High NXDOMAIN volume can come from stale software, search suffixes, typo correction, broken service discovery, ad/tracker blocking, or misconfiguration.\n- Beacon-like panels show **repetition/concentration**, not mathematically proven periodicity.\n- Use Storyline, process path, command line, user, response data, IP Connect, URL telemetry, and Threat Intelligence before escalation.\n\n## MITRE ATT&CK alignment\nPrimary operational alignment:\n- **T1071.004 — Application Layer Protocol: DNS**\n- **T1568.002 — Dynamic Resolution: Domain Generation Algorithms**\n- **T1041 — Exfiltration Over C2 Channel**\n- **T1095 — Non-Application Layer Protocol** as contextual C2 hunting where DNS-adjacent tooling transitions to custom protocols.\n\n## Recommended SOC workflow\n**DNS Command Center → C2 & Abuse Infrastructure → NXDOMAIN → DGA & Domain Anomalies → DNS Tunneling → Threat Intelligence → Endpoint & Process → Investigation → Detection Engineering**\n\n\n## V1.1 compatibility correction\nDashboard Event Search regular-expression comparisons use `matches`. V1.1 replaces the unsupported `regexp` token in regex-based dashboard panels with `matches`.\n\nDeveloped by the Threat Detection Engineering Division at NeverOff Technology (SentinelOne Division)\nDominican Republic",
+          "description": "",
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 60,
+            "h": 48
+          }
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    },
+    {
+      "tabName": "DNS Command Center",
+      "filters": [
+        {
+          "facet": "site.name",
+          "name": "Site"
+        },
+        {
+          "facet": "endpoint.name",
+          "name": "Endpoint"
+        },
+        {
+          "facet": "endpoint.os",
+          "name": "OS"
+        },
+        {
+          "facet": "src.process.name",
+          "name": "Process"
+        },
+        {
+          "facet": "src.process.user",
+          "name": "User"
+        },
+        {
+          "facet": "event.dns.responseCode",
+          "name": "DNS Response Code"
+        },
+        {
+          "facet": "event.dns.transportProtocol",
+          "name": "DNS Transport"
+        },
+        {
+          "facet": "event.dns.protocol",
+          "name": "DNS Protocol"
+        },
+        {
+          "facet": "event.dns.provider",
+          "name": "DNS Provider"
+        }
+      ],
+      "graphs": [
+        {
+          "title": "DNS Events",
+          "description": "Total DNS request/response telemetry in the selected time range.",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\") | group DNS_Events = count()",
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Distinct Requested Domains",
+          "description": "Estimated distinct DNS request values.",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.request)) | group Domains = estimate_distinct(event.dns.request)",
+          "layout": {
+            "x": 10,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Endpoints with DNS Activity",
+          "description": "Protected endpoints producing DNS telemetry.",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND !isempty(endpoint.name)) | group Endpoints = estimate_distinct(endpoint.name)",
+          "layout": {
+            "x": 20,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "DNS Source Processes",
+          "description": "Distinct processes associated with DNS telemetry.",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND !isempty(src.process.name)) | group Processes = estimate_distinct(src.process.name)",
+          "layout": {
+            "x": 30,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "NXDOMAIN Events",
+          "description": "DNS events with response code 3.",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND event.dns.responseCode == 3) | group NXDOMAIN = count()",
+          "layout": {
+            "x": 40,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Non-Zero DNS Response Codes",
+          "description": "DNS events whose response code is not zero.",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND event.dns.responseCode != 0) | group NonZeroResponses = count()",
+          "layout": {
+            "x": 50,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "DNS Activity Over Time",
+          "description": "Hourly DNS telemetry trend.",
+          "graphStyle": "line",
+          "query": "| filter(event.category == \"dns\") | group DNS_Events = count() by timestamp = timebucket('1 hour')",
+          "layout": {
+            "x": 0,
+            "y": 7,
+            "w": 60,
+            "h": 10
+          },
+          "lineSmoothing": "straightLines",
+          "plotNulls": "gaps",
+          "xAxis": "time",
+          "yScale": "linear"
+        },
+        {
+          "title": "DNS Response Codes",
+          "description": "Distribution of DNS response-code values.",
+          "graphStyle": "donut",
+          "dataLabelType": "PERCENTAGE",
+          "maxPieSlices": 12,
+          "query": "| filter(event.category == \"dns\") | group DNS_Events = count() by event.dns.responseCode | sort -DNS_Events",
+          "layout": {
+            "x": 0,
+            "y": 17,
+            "w": 15,
+            "h": 14
+          }
+        },
+        {
+          "title": "DNS Transport Protocol",
+          "description": "Observed DNS transport protocol values.",
+          "graphStyle": "donut",
+          "dataLabelType": "PERCENTAGE",
+          "maxPieSlices": 8,
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.transportProtocol)) | group DNS_Events = count() by event.dns.transportProtocol | sort -DNS_Events",
+          "layout": {
+            "x": 15,
+            "y": 17,
+            "w": 15,
+            "h": 14
+          }
+        },
+        {
+          "title": "DNS Protocol Values",
+          "description": "Observed values of event.dns.protocol.",
+          "graphStyle": "donut",
+          "dataLabelType": "PERCENTAGE",
+          "maxPieSlices": 12,
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.protocol)) | group DNS_Events = count() by event.dns.protocol | sort -DNS_Events",
+          "layout": {
+            "x": 30,
+            "y": 17,
+            "w": 15,
+            "h": 14
+          }
+        },
+        {
+          "title": "DNS Telemetry Provider",
+          "description": "Telemetry providers associated with DNS events.",
+          "graphStyle": "donut",
+          "dataLabelType": "PERCENTAGE",
+          "maxPieSlices": 10,
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.provider)) | group DNS_Events = count() by event.dns.provider | sort -DNS_Events",
+          "layout": {
+            "x": 45,
+            "y": 17,
+            "w": 15,
+            "h": 14
+          }
+        },
+        {
+          "title": "Top Requested Domains",
+          "description": "Most frequently requested DNS names.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.request)) | group Lookups = count(), Endpoints = estimate_distinct(endpoint.name), Processes = estimate_distinct(src.process.name) by event.dns.request | sort -Lookups | limit 30",
+          "layout": {
+            "x": 0,
+            "y": 31,
+            "w": 20,
+            "h": 16
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "Top Endpoints by DNS Volume",
+          "description": "Endpoints generating the greatest DNS volume.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND !isempty(endpoint.name)) | group DNS_Events = count(), Domains = estimate_distinct(event.dns.request), Processes = estimate_distinct(src.process.name) by endpoint.name, endpoint.os, site.name | sort -DNS_Events | limit 30",
+          "layout": {
+            "x": 20,
+            "y": 31,
+            "w": 20,
+            "h": 16
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "Top Processes by DNS Volume",
+          "description": "Processes associated with the most DNS events.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND !isempty(src.process.name)) | group DNS_Events = count(), Domains = estimate_distinct(event.dns.request), Endpoints = estimate_distinct(endpoint.name) by src.process.name | sort -DNS_Events | limit 30",
+          "layout": {
+            "x": 40,
+            "y": 31,
+            "w": 20,
+            "h": 16
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "Endpoint → Process → Requested Domain",
+          "description": "High-level DNS flow from endpoint to process to requested domain.",
+          "graphStyle": "sankey",
+          "sankeyColorScheme": "default",
+          "showNodeValues": "true",
+          "colorMatching": "automatic",
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.request))\n| let Host = \"Endpoint: \" + endpoint.name\n| let Proc = src.process.name != null ? \"Process: \" + src.process.name : \"Process: Unattributed/System\"\n| let Domain = \"DNS: \" + event.dns.request\n| group c = count() by Host, Proc, Domain\n| sort -c\n| limit 45\n| let link = array(0,1).expand()\n| let source = link == 0 ? Host : Proc\n| let target = link == 0 ? Proc : Domain\n| group c = sum(c) by source, target\n| columns source, target, c",
+          "layout": {
+            "x": 0,
+            "y": 47,
+            "w": 60,
+            "h": 16
+          }
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    },
+    {
+      "tabName": "C2 & Abuse Infrastructure",
+      "filters": [
+        {
+          "facet": "site.name",
+          "name": "Site"
+        },
+        {
+          "facet": "endpoint.name",
+          "name": "Endpoint"
+        },
+        {
+          "facet": "endpoint.os",
+          "name": "OS"
+        },
+        {
+          "facet": "src.process.name",
+          "name": "Process"
+        },
+        {
+          "facet": "src.process.user",
+          "name": "User"
+        },
+        {
+          "facet": "event.dns.responseCode",
+          "name": "DNS Response Code"
+        },
+        {
+          "facet": "event.dns.transportProtocol",
+          "name": "DNS Transport"
+        },
+        {
+          "facet": "event.dns.protocol",
+          "name": "DNS Protocol"
+        },
+        {
+          "facet": "event.dns.provider",
+          "name": "DNS Provider"
+        }
+      ],
+      "graphs": [
+        {
+          "title": "Dual-Use / Abuse-Prone DNS Events",
+          "description": "DNS requests to the embedded NeverOff dual-use / abuse-prone infrastructure watchlist.",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND (event.dns.request contains:anycase(\"duckdns.org\",\"no-ip.com\",\"no-ip.org\",\"hopto.org\",\"ddns.net\",\"dynu.net\",\"freedns.afraid.org\",\"serveftp.com\",\"servehttp.com\",\"sytes.net\",\"ngrok.io\",\"ngrok.app\",\"trycloudflare.com\",\"loca.lt\",\"serveo.net\",\"localhost.run\",\"bore.pub\",\"pastebin.com\",\"paste.ee\",\"paste.rs\",\"raw.githubusercontent.com\",\"githubusercontent.com\",\"cdn.discordapp.com\",\"discordapp.com\",\"discord.com\",\"transfer.sh\",\"catbox.moe\",\"gofile.io\",\"dns.google\",\"cloudflare-dns.com\",\"mozilla.cloudflare-dns.com\",\"dns.quad9.net\",\"doh.opendns.com\",\"dns.nextdns.io\",\"adguard-dns.com\"))) | group Events = count()",
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Dynamic DNS Events",
+          "description": "Requests to monitored Dynamic DNS provider domains.",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND (event.dns.request contains:anycase(\"duckdns.org\",\"no-ip.com\",\"no-ip.org\",\"hopto.org\",\"ddns.net\",\"dynu.net\",\"freedns.afraid.org\",\"serveftp.com\",\"servehttp.com\",\"sytes.net\"))) | group Events = count()",
+          "layout": {
+            "x": 10,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Tunnel / Relay Infrastructure Events",
+          "description": "Requests to monitored public tunneling or relay service domains.",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND (event.dns.request contains:anycase(\"ngrok.io\",\"ngrok.app\",\"trycloudflare.com\",\"loca.lt\",\"serveo.net\",\"localhost.run\",\"bore.pub\"))) | group Events = count()",
+          "layout": {
+            "x": 20,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Paste / CDN / Public Transfer Events",
+          "description": "Requests to monitored public content/CDN/file-transfer domains often used legitimately and by adversaries.",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND (event.dns.request contains:anycase(\"pastebin.com\",\"paste.ee\",\"paste.rs\",\"raw.githubusercontent.com\",\"githubusercontent.com\",\"cdn.discordapp.com\",\"discordapp.com\",\"discord.com\",\"transfer.sh\",\"catbox.moe\",\"gofile.io\"))) | group Events = count()",
+          "layout": {
+            "x": 30,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Encrypted DNS Resolver Domains",
+          "description": "Requests to monitored DoH/encrypted-DNS resolver domains. Presence is not automatically malicious.",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND (event.dns.request contains:anycase(\"dns.google\",\"cloudflare-dns.com\",\"mozilla.cloudflare-dns.com\",\"dns.quad9.net\",\"doh.opendns.com\",\"dns.nextdns.io\",\"adguard-dns.com\"))) | group Events = count()",
+          "layout": {
+            "x": 40,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": ".onion Resolution Attempts",
+          "description": "DNS requests containing .onion; useful for spotting Tor-related resolution attempts or misconfiguration.",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND event.dns.request contains:anycase(\".onion\")) | group Events = count()",
+          "layout": {
+            "x": 50,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Abuse-Prone Infrastructure Activity Over Time",
+          "description": "Trend of monitored dual-use infrastructure categories.",
+          "graphStyle": "line",
+          "query": "| filter(event.category == \"dns\" AND ((event.dns.request contains:anycase(\"duckdns.org\",\"no-ip.com\",\"no-ip.org\",\"hopto.org\",\"ddns.net\",\"dynu.net\",\"freedns.afraid.org\",\"serveftp.com\",\"servehttp.com\",\"sytes.net\",\"ngrok.io\",\"ngrok.app\",\"trycloudflare.com\",\"loca.lt\",\"serveo.net\",\"localhost.run\",\"bore.pub\",\"pastebin.com\",\"paste.ee\",\"paste.rs\",\"raw.githubusercontent.com\",\"githubusercontent.com\",\"cdn.discordapp.com\",\"discordapp.com\",\"discord.com\",\"transfer.sh\",\"catbox.moe\",\"gofile.io\",\"dns.google\",\"cloudflare-dns.com\",\"mozilla.cloudflare-dns.com\",\"dns.quad9.net\",\"doh.opendns.com\",\"dns.nextdns.io\",\"adguard-dns.com\")) OR event.dns.request contains:anycase(\".onion\")))\n| let Category = event.dns.request contains:anycase(\"duckdns.org\",\"no-ip.com\",\"no-ip.org\",\"hopto.org\",\"ddns.net\",\"dynu.net\",\"freedns.afraid.org\",\"serveftp.com\",\"servehttp.com\",\"sytes.net\") ? \"Dynamic DNS\" : event.dns.request contains:anycase(\"ngrok.io\",\"ngrok.app\",\"trycloudflare.com\",\"loca.lt\",\"serveo.net\",\"localhost.run\",\"bore.pub\") ? \"Tunnel / Relay\" : event.dns.request contains:anycase(\"pastebin.com\",\"paste.ee\",\"paste.rs\",\"raw.githubusercontent.com\",\"githubusercontent.com\",\"cdn.discordapp.com\",\"discordapp.com\",\"discord.com\",\"transfer.sh\",\"catbox.moe\",\"gofile.io\") ? \"Paste / CDN / Transfer\" : event.dns.request contains:anycase(\"dns.google\",\"cloudflare-dns.com\",\"mozilla.cloudflare-dns.com\",\"dns.quad9.net\",\"doh.opendns.com\",\"dns.nextdns.io\",\"adguard-dns.com\") ? \"Encrypted DNS Resolver\" : event.dns.request contains:anycase(\".onion\") ? \".onion\" : \"Other\"\n| group Events = count() by timestamp = timebucket('1 hour'), Category\n| transpose Category on timestamp",
+          "layout": {
+            "x": 0,
+            "y": 7,
+            "w": 60,
+            "h": 11
+          },
+          "lineSmoothing": "straightLines",
+          "plotNulls": "gaps",
+          "xAxis": "time",
+          "yScale": "linear",
+          "valueColors": [
+            {
+              "value": "Dynamic DNS",
+              "color": "#FFB020"
+            },
+            {
+              "value": "Tunnel / Relay",
+              "color": "#FF3B5C"
+            },
+            {
+              "value": "Paste / CDN / Transfer",
+              "color": "#9B6CFF"
+            },
+            {
+              "value": "Encrypted DNS Resolver",
+              "color": "#00C2FF"
+            },
+            {
+              "value": ".onion",
+              "color": "#FF6B00"
+            }
+          ]
+        },
+        {
+          "title": "Top Monitored Dual-Use Domains",
+          "description": "Monitored dual-use domains ranked by event volume.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND ((event.dns.request contains:anycase(\"duckdns.org\",\"no-ip.com\",\"no-ip.org\",\"hopto.org\",\"ddns.net\",\"dynu.net\",\"freedns.afraid.org\",\"serveftp.com\",\"servehttp.com\",\"sytes.net\",\"ngrok.io\",\"ngrok.app\",\"trycloudflare.com\",\"loca.lt\",\"serveo.net\",\"localhost.run\",\"bore.pub\",\"pastebin.com\",\"paste.ee\",\"paste.rs\",\"raw.githubusercontent.com\",\"githubusercontent.com\",\"cdn.discordapp.com\",\"discordapp.com\",\"discord.com\",\"transfer.sh\",\"catbox.moe\",\"gofile.io\",\"dns.google\",\"cloudflare-dns.com\",\"mozilla.cloudflare-dns.com\",\"dns.quad9.net\",\"doh.opendns.com\",\"dns.nextdns.io\",\"adguard-dns.com\")) OR event.dns.request contains:anycase(\".onion\"))) | group Events = count(), Endpoints = estimate_distinct(endpoint.name), Processes = estimate_distinct(src.process.name), Users = estimate_distinct(src.process.user) by event.dns.request | sort -Events | limit 50",
+          "layout": {
+            "x": 0,
+            "y": 18,
+            "w": 30,
+            "h": 17
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "Endpoint / Process Attribution",
+          "description": "Endpoints, processes and users generating monitored requests.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND ((event.dns.request contains:anycase(\"duckdns.org\",\"no-ip.com\",\"no-ip.org\",\"hopto.org\",\"ddns.net\",\"dynu.net\",\"freedns.afraid.org\",\"serveftp.com\",\"servehttp.com\",\"sytes.net\",\"ngrok.io\",\"ngrok.app\",\"trycloudflare.com\",\"loca.lt\",\"serveo.net\",\"localhost.run\",\"bore.pub\",\"pastebin.com\",\"paste.ee\",\"paste.rs\",\"raw.githubusercontent.com\",\"githubusercontent.com\",\"cdn.discordapp.com\",\"discordapp.com\",\"discord.com\",\"transfer.sh\",\"catbox.moe\",\"gofile.io\",\"dns.google\",\"cloudflare-dns.com\",\"mozilla.cloudflare-dns.com\",\"dns.quad9.net\",\"doh.opendns.com\",\"dns.nextdns.io\",\"adguard-dns.com\")) OR event.dns.request contains:anycase(\".onion\"))) | group Events = count(), Domains = estimate_distinct(event.dns.request) by endpoint.name, site.name, src.process.name, src.process.user | sort -Events | limit 75",
+          "layout": {
+            "x": 30,
+            "y": 18,
+            "w": 30,
+            "h": 17
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "Category → Domain → Process → Endpoint",
+          "description": "Investigation flow for monitored dual-use infrastructure.",
+          "graphStyle": "sankey",
+          "sankeyColorScheme": "default",
+          "showNodeValues": "true",
+          "colorMatching": "automatic",
+          "query": "| filter(event.category == \"dns\" AND ((event.dns.request contains:anycase(\"duckdns.org\",\"no-ip.com\",\"no-ip.org\",\"hopto.org\",\"ddns.net\",\"dynu.net\",\"freedns.afraid.org\",\"serveftp.com\",\"servehttp.com\",\"sytes.net\",\"ngrok.io\",\"ngrok.app\",\"trycloudflare.com\",\"loca.lt\",\"serveo.net\",\"localhost.run\",\"bore.pub\",\"pastebin.com\",\"paste.ee\",\"paste.rs\",\"raw.githubusercontent.com\",\"githubusercontent.com\",\"cdn.discordapp.com\",\"discordapp.com\",\"discord.com\",\"transfer.sh\",\"catbox.moe\",\"gofile.io\",\"dns.google\",\"cloudflare-dns.com\",\"mozilla.cloudflare-dns.com\",\"dns.quad9.net\",\"doh.opendns.com\",\"dns.nextdns.io\",\"adguard-dns.com\")) OR event.dns.request contains:anycase(\".onion\")))\n| let Category = event.dns.request contains:anycase(\"duckdns.org\",\"no-ip.com\",\"no-ip.org\",\"hopto.org\",\"ddns.net\",\"dynu.net\",\"freedns.afraid.org\",\"serveftp.com\",\"servehttp.com\",\"sytes.net\") ? \"Dynamic DNS\" : event.dns.request contains:anycase(\"ngrok.io\",\"ngrok.app\",\"trycloudflare.com\",\"loca.lt\",\"serveo.net\",\"localhost.run\",\"bore.pub\") ? \"Tunnel / Relay\" : event.dns.request contains:anycase(\"pastebin.com\",\"paste.ee\",\"paste.rs\",\"raw.githubusercontent.com\",\"githubusercontent.com\",\"cdn.discordapp.com\",\"discordapp.com\",\"discord.com\",\"transfer.sh\",\"catbox.moe\",\"gofile.io\") ? \"Paste / CDN / Transfer\" : event.dns.request contains:anycase(\"dns.google\",\"cloudflare-dns.com\",\"mozilla.cloudflare-dns.com\",\"dns.quad9.net\",\"doh.opendns.com\",\"dns.nextdns.io\",\"adguard-dns.com\") ? \"Encrypted DNS Resolver\" : event.dns.request contains:anycase(\".onion\") ? \".onion\" : \"Other\"\n| let Domain = \"Domain: \" + event.dns.request\n| let Proc = src.process.name != null ? \"Process: \" + src.process.name : \"Process: Unattributed/System\"\n| let Host = \"Endpoint: \" + endpoint.name\n| group c = count() by Category, Domain, Proc, Host\n| sort -c\n| limit 40\n| let link = array(0,1,2).expand()\n| let source = link == 0 ? Category : link == 1 ? Domain : Proc\n| let target = link == 0 ? Domain : link == 1 ? Proc : Host\n| group c = sum(c) by source, target\n| columns source, target, c",
+          "layout": {
+            "x": 0,
+            "y": 35,
+            "w": 60,
+            "h": 17
+          }
+        },
+        {
+          "title": "Raw Tunnel / Relay DNS Activity",
+          "description": "Raw events for monitored tunnel / relay infrastructure.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND (event.dns.request contains:anycase(\"ngrok.io\",\"ngrok.app\",\"trycloudflare.com\",\"loca.lt\",\"serveo.net\",\"localhost.run\",\"bore.pub\"))) | columns event.time, site.name, endpoint.name, endpoint.os, src.process.user, src.process.name, src.process.cmdline, event.dns.request, event.dns.response, event.dns.responseCode, event.dns.transportProtocol | sort -event.time | limit 200",
+          "layout": {
+            "x": 0,
+            "y": 52,
+            "w": 30,
+            "h": 16
+          }
+        },
+        {
+          "title": "Raw Encrypted Resolver Discovery",
+          "description": "Raw DNS discovery of monitored encrypted resolver domains.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND (event.dns.request contains:anycase(\"dns.google\",\"cloudflare-dns.com\",\"mozilla.cloudflare-dns.com\",\"dns.quad9.net\",\"doh.opendns.com\",\"dns.nextdns.io\",\"adguard-dns.com\"))) | columns event.time, site.name, endpoint.name, endpoint.os, src.process.user, src.process.name, src.process.cmdline, event.dns.request, event.dns.response, event.dns.responseCode | sort -event.time | limit 200",
+          "layout": {
+            "x": 30,
+            "y": 52,
+            "w": 30,
+            "h": 16
+          }
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    },
+    {
+      "tabName": "NXDOMAIN & Resolution Failure",
+      "filters": [
+        {
+          "facet": "site.name",
+          "name": "Site"
+        },
+        {
+          "facet": "endpoint.name",
+          "name": "Endpoint"
+        },
+        {
+          "facet": "endpoint.os",
+          "name": "OS"
+        },
+        {
+          "facet": "src.process.name",
+          "name": "Process"
+        },
+        {
+          "facet": "src.process.user",
+          "name": "User"
+        },
+        {
+          "facet": "event.dns.responseCode",
+          "name": "DNS Response Code"
+        },
+        {
+          "facet": "event.dns.transportProtocol",
+          "name": "DNS Transport"
+        },
+        {
+          "facet": "event.dns.protocol",
+          "name": "DNS Protocol"
+        },
+        {
+          "facet": "event.dns.provider",
+          "name": "DNS Provider"
+        }
+      ],
+      "graphs": [
+        {
+          "title": "NXDOMAIN Events",
+          "description": "",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND event.dns.responseCode == 3) | group NXDOMAIN = count()",
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "NXDOMAIN Domains",
+          "description": "",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND event.dns.responseCode == 3 AND !isempty(event.dns.request)) | group Domains = estimate_distinct(event.dns.request)",
+          "layout": {
+            "x": 10,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Endpoints with NXDOMAIN",
+          "description": "",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND event.dns.responseCode == 3 AND !isempty(endpoint.name)) | group Endpoints = estimate_distinct(endpoint.name)",
+          "layout": {
+            "x": 20,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Processes with NXDOMAIN",
+          "description": "",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND event.dns.responseCode == 3 AND !isempty(src.process.name)) | group Processes = estimate_distinct(src.process.name)",
+          "layout": {
+            "x": 30,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "NXDOMAIN Burst Buckets",
+          "description": "15-minute endpoint/process buckets with at least 20 NXDOMAIN events.",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND event.dns.responseCode == 3) | group Failures = count() by timestamp = timebucket('15 minutes'), endpoint.name, src.process.name | filter Failures >= 20 | group BurstBuckets = count()",
+          "layout": {
+            "x": 40,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "High-Unique Failed Domain Candidates",
+          "description": "Endpoint/process pairs with broad failed-domain diversity.",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND event.dns.responseCode == 3 AND !isempty(event.dns.request)) | group Failures = count(), UniqueFailedDomains = estimate_distinct(event.dns.request) by endpoint.name, src.process.name | filter Failures >= 30 AND UniqueFailedDomains >= 20 | group Candidates = count()",
+          "layout": {
+            "x": 50,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "NXDOMAIN Activity Over Time",
+          "description": "NXDOMAIN trend over the selected period.",
+          "graphStyle": "line",
+          "query": "| filter(event.category == \"dns\" AND event.dns.responseCode == 3) | group NXDOMAIN = count() by timestamp = timebucket('1 hour')",
+          "layout": {
+            "x": 0,
+            "y": 7,
+            "w": 60,
+            "h": 10
+          },
+          "lineSmoothing": "straightLines",
+          "plotNulls": "gaps",
+          "xAxis": "time",
+          "yScale": "linear"
+        },
+        {
+          "title": "Top NXDOMAIN Requests",
+          "description": "Failed domains ranked by NXDOMAIN volume.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND event.dns.responseCode == 3 AND !isempty(event.dns.request)) | group Failures = count(), Endpoints = estimate_distinct(endpoint.name), Processes = estimate_distinct(src.process.name) by event.dns.request | sort -Failures | limit 50",
+          "layout": {
+            "x": 0,
+            "y": 17,
+            "w": 30,
+            "h": 16
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "Top Endpoint / Process NXDOMAIN Sources",
+          "description": "Endpoint/process pairs producing NXDOMAIN activity.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND event.dns.responseCode == 3) | group Failures = count(), UniqueFailedDomains = estimate_distinct(event.dns.request) by endpoint.name, site.name, src.process.name, src.process.user | sort -Failures | limit 75",
+          "layout": {
+            "x": 30,
+            "y": 17,
+            "w": 30,
+            "h": 16
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "NXDOMAIN Burst Candidates — 15 Minute",
+          "description": "NeverOff heuristic: >=20 NXDOMAIN events in one 15-minute endpoint/process bucket.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND event.dns.responseCode == 3) | group Failures = count(), UniqueDomains = estimate_distinct(event.dns.request) by timestamp = timebucket('15 minutes'), endpoint.name, src.process.name | filter Failures >= 20 | sort -Failures | limit 100",
+          "layout": {
+            "x": 0,
+            "y": 33,
+            "w": 30,
+            "h": 17
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "Broad NXDOMAIN / DGA-Like Candidates",
+          "description": "High failed-domain diversity may indicate DGA activity, stale software, ad blocking or misconfiguration.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND event.dns.responseCode == 3 AND !isempty(event.dns.request)) | group Failures = count(), UniqueFailedDomains = estimate_distinct(event.dns.request) by endpoint.name, src.process.name | filter Failures >= 30 AND UniqueFailedDomains >= 20 | sort -UniqueFailedDomains | limit 100",
+          "layout": {
+            "x": 30,
+            "y": 33,
+            "w": 30,
+            "h": 17
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "Endpoint → Process → NXDOMAIN Request",
+          "description": "NXDOMAIN attribution flow.",
+          "graphStyle": "sankey",
+          "sankeyColorScheme": "default",
+          "showNodeValues": "true",
+          "colorMatching": "automatic",
+          "query": "| filter(event.category == \"dns\" AND event.dns.responseCode == 3 AND !isempty(event.dns.request))\n| let Host = \"Endpoint: \" + endpoint.name\n| let Proc = src.process.name != null ? \"Process: \" + src.process.name : \"Process: Unattributed/System\"\n| let Domain = \"NXDOMAIN: \" + event.dns.request\n| group c = count() by Host, Proc, Domain\n| sort -c\n| limit 45\n| let link = array(0,1).expand()\n| let source = link == 0 ? Host : Proc\n| let target = link == 0 ? Proc : Domain\n| group c = sum(c) by source, target\n| columns source, target, c",
+          "layout": {
+            "x": 0,
+            "y": 50,
+            "w": 60,
+            "h": 17
+          }
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    },
+    {
+      "tabName": "DGA & Domain Anomalies",
+      "filters": [
+        {
+          "facet": "site.name",
+          "name": "Site"
+        },
+        {
+          "facet": "endpoint.name",
+          "name": "Endpoint"
+        },
+        {
+          "facet": "endpoint.os",
+          "name": "OS"
+        },
+        {
+          "facet": "src.process.name",
+          "name": "Process"
+        },
+        {
+          "facet": "src.process.user",
+          "name": "User"
+        },
+        {
+          "facet": "event.dns.responseCode",
+          "name": "DNS Response Code"
+        },
+        {
+          "facet": "event.dns.transportProtocol",
+          "name": "DNS Transport"
+        },
+        {
+          "facet": "event.dns.protocol",
+          "name": "DNS Protocol"
+        },
+        {
+          "facet": "event.dns.provider",
+          "name": "DNS Provider"
+        }
+      ],
+      "graphs": [
+        {
+          "title": "High-Abuse TLD Watchlist Events",
+          "description": "",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND (event.dns.request contains:anycase(\".xyz\",\".top\",\".pw\",\".gq\",\".ga\",\".cf\",\".tk\"))) | group Events = count()",
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Extended TLD Monitoring Events",
+          "description": "",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND (event.dns.request contains:anycase(\".click\",\".work\",\".site\",\".online\",\".live\",\".icu\",\".buzz\",\".cam\",\".cyou\",\".monster\",\".quest\",\".sbs\"))) | group Events = count()",
+          "layout": {
+            "x": 10,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Long DNS Requests ≥80",
+          "description": "",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.request)) | let RequestLength = len(event.dns.request) | filter RequestLength >= 80 | group Events = count()",
+          "layout": {
+            "x": 20,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Very Long DNS Requests ≥120",
+          "description": "",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.request)) | let RequestLength = len(event.dns.request) | filter RequestLength >= 120 | group Events = count()",
+          "layout": {
+            "x": 30,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Encoded-Like Label Candidates",
+          "description": "",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.request) AND event.dns.request matches \".*([A-Fa-f0-9]{32,}|[A-Za-z2-7]{40,})\\..*\") | group Events = count()",
+          "layout": {
+            "x": 40,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Deep-Label Candidates",
+          "description": "",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.request) AND event.dns.request matches \"^([^.]+\\.){5,}[^.]+$\") | group Events = count()",
+          "layout": {
+            "x": 50,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "DNS Anomaly Categories Over Time",
+          "description": "Trend of NeverOff DNS anomaly heuristics.",
+          "graphStyle": "line",
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.request))\n| let RequestLength = len(event.dns.request)\n| filter(RequestLength >= 80 OR event.dns.request matches \".*([A-Fa-f0-9]{32,}|[A-Za-z2-7]{40,})\\..*\" OR event.dns.request matches \"^([^.]+\\.){5,}[^.]+$\" OR (event.dns.request contains:anycase(\".xyz\",\".top\",\".pw\",\".gq\",\".ga\",\".cf\",\".tk\")) OR (event.dns.request contains:anycase(\".click\",\".work\",\".site\",\".online\",\".live\",\".icu\",\".buzz\",\".cam\",\".cyou\",\".monster\",\".quest\",\".sbs\")))\n| let Anomaly = event.dns.request matches \".*([A-Fa-f0-9]{32,}|[A-Za-z2-7]{40,})\\..*\" ? \"Encoded-Like Label\" : event.dns.request matches \".*[A-Za-z0-9]{20,}\\.(xyz|top|pw|click|work|site|online|live|icu|buzz|cam|cyou|monster|quest|sbs)$\" ? \"Long Alphanumeric + Watched TLD\" : event.dns.request matches \"^([^.]+\\.){5,}[^.]+$\" ? \"Deep Label Chain\" : len(event.dns.request) >= 120 ? \"Very Long Request\" : (event.dns.request contains:anycase(\".xyz\",\".top\",\".pw\",\".gq\",\".ga\",\".cf\",\".tk\")) ? \"High-Abuse TLD Watchlist\" : (event.dns.request contains:anycase(\".click\",\".work\",\".site\",\".online\",\".live\",\".icu\",\".buzz\",\".cam\",\".cyou\",\".monster\",\".quest\",\".sbs\")) ? \"Extended TLD Watchlist\" : \"Other\"\n| group Events = count() by timestamp = timebucket('1 hour'), Anomaly\n| transpose Anomaly on timestamp",
+          "layout": {
+            "x": 0,
+            "y": 7,
+            "w": 60,
+            "h": 11
+          },
+          "lineSmoothing": "straightLines",
+          "plotNulls": "gaps",
+          "xAxis": "time",
+          "yScale": "linear"
+        },
+        {
+          "title": "Top Long DNS Requests",
+          "description": "Long DNS request candidates ranked by request length.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.request)) | let RequestLength = len(event.dns.request) | filter RequestLength >= 80 | group Events = count(), Endpoints = estimate_distinct(endpoint.name), Processes = estimate_distinct(src.process.name) by event.dns.request, RequestLength | sort -RequestLength | limit 75",
+          "layout": {
+            "x": 0,
+            "y": 18,
+            "w": 30,
+            "h": 17
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "Encoded-Like / DGA-Like Candidates",
+          "description": "Long encoded-looking labels or long alphanumeric labels on monitored TLDs.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.request) AND (event.dns.request matches \".*([A-Fa-f0-9]{32,}|[A-Za-z2-7]{40,})\\..*\" OR event.dns.request matches \".*[A-Za-z0-9]{20,}\\.(xyz|top|pw|click|work|site|online|live|icu|buzz|cam|cyou|monster|quest|sbs)$\")) | let RequestLength = len(event.dns.request) | group Events = count(), Endpoints = estimate_distinct(endpoint.name), Processes = estimate_distinct(src.process.name) by event.dns.request, RequestLength | sort -Events | limit 100",
+          "layout": {
+            "x": 30,
+            "y": 18,
+            "w": 30,
+            "h": 17
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "Endpoint / Process Domain Anomaly Ranking",
+          "description": "Endpoints/processes generating the greatest anomalous-domain volume.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.request))\n| let RequestLength = len(event.dns.request)\n| filter(RequestLength >= 80 OR event.dns.request matches \".*([A-Fa-f0-9]{32,}|[A-Za-z2-7]{40,})\\..*\" OR event.dns.request matches \"^([^.]+\\.){5,}[^.]+$\" OR (event.dns.request contains:anycase(\".xyz\",\".top\",\".pw\",\".gq\",\".ga\",\".cf\",\".tk\")) OR (event.dns.request contains:anycase(\".click\",\".work\",\".site\",\".online\",\".live\",\".icu\",\".buzz\",\".cam\",\".cyou\",\".monster\",\".quest\",\".sbs\")))\n| group Events = count(), Domains = estimate_distinct(event.dns.request) by endpoint.name, site.name, src.process.name, src.process.user\n| sort -Events\n| limit 100",
+          "layout": {
+            "x": 0,
+            "y": 35,
+            "w": 30,
+            "h": 17
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "Watched TLD Requests",
+          "description": "Policy-driven TLD monitoring. TLD alone is not evidence of maliciousness.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND ((event.dns.request contains:anycase(\".xyz\",\".top\",\".pw\",\".gq\",\".ga\",\".cf\",\".tk\")) OR (event.dns.request contains:anycase(\".click\",\".work\",\".site\",\".online\",\".live\",\".icu\",\".buzz\",\".cam\",\".cyou\",\".monster\",\".quest\",\".sbs\"))))\n| let TLD_Tier = (event.dns.request contains:anycase(\".xyz\",\".top\",\".pw\",\".gq\",\".ga\",\".cf\",\".tk\")) ? \"High-Abuse Watchlist\" : \"Extended Monitoring\"\n| group Events = count(), Endpoints = estimate_distinct(endpoint.name), Processes = estimate_distinct(src.process.name) by TLD_Tier, event.dns.request\n| sort -Events\n| limit 100",
+          "layout": {
+            "x": 30,
+            "y": 35,
+            "w": 30,
+            "h": 17
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "Anomaly Type → Domain → Process → Endpoint",
+          "description": "Visual investigation of domain-anomaly heuristics.",
+          "graphStyle": "sankey",
+          "sankeyColorScheme": "default",
+          "showNodeValues": "true",
+          "colorMatching": "automatic",
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.request))\n| let RequestLength = len(event.dns.request)\n| filter(RequestLength >= 80 OR event.dns.request matches \".*([A-Fa-f0-9]{32,}|[A-Za-z2-7]{40,})\\..*\" OR event.dns.request matches \"^([^.]+\\.){5,}[^.]+$\" OR (event.dns.request contains:anycase(\".xyz\",\".top\",\".pw\",\".gq\",\".ga\",\".cf\",\".tk\")) OR (event.dns.request contains:anycase(\".click\",\".work\",\".site\",\".online\",\".live\",\".icu\",\".buzz\",\".cam\",\".cyou\",\".monster\",\".quest\",\".sbs\")))\n| let Anomaly = event.dns.request matches \".*([A-Fa-f0-9]{32,}|[A-Za-z2-7]{40,})\\..*\" ? \"Encoded-Like Label\" : event.dns.request matches \".*[A-Za-z0-9]{20,}\\.(xyz|top|pw|click|work|site|online|live|icu|buzz|cam|cyou|monster|quest|sbs)$\" ? \"Long Alphanumeric + Watched TLD\" : event.dns.request matches \"^([^.]+\\.){5,}[^.]+$\" ? \"Deep Label Chain\" : len(event.dns.request) >= 120 ? \"Very Long Request\" : (event.dns.request contains:anycase(\".xyz\",\".top\",\".pw\",\".gq\",\".ga\",\".cf\",\".tk\")) ? \"High-Abuse TLD Watchlist\" : (event.dns.request contains:anycase(\".click\",\".work\",\".site\",\".online\",\".live\",\".icu\",\".buzz\",\".cam\",\".cyou\",\".monster\",\".quest\",\".sbs\")) ? \"Extended TLD Watchlist\" : \"Other\"\n| let Domain = \"Domain: \" + event.dns.request\n| let Proc = src.process.name != null ? \"Process: \" + src.process.name : \"Process: Unattributed/System\"\n| let Host = \"Endpoint: \" + endpoint.name\n| group c = count() by Anomaly, Domain, Proc, Host\n| sort -c\n| limit 40\n| let link = array(0,1,2).expand()\n| let source = link == 0 ? Anomaly : link == 1 ? Domain : Proc\n| let target = link == 0 ? Domain : link == 1 ? Proc : Host\n| group c = sum(c) by source, target\n| columns source, target, c",
+          "layout": {
+            "x": 0,
+            "y": 52,
+            "w": 60,
+            "h": 17
+          }
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    },
+    {
+      "tabName": "DNS Tunneling & Exfiltration",
+      "filters": [
+        {
+          "facet": "site.name",
+          "name": "Site"
+        },
+        {
+          "facet": "endpoint.name",
+          "name": "Endpoint"
+        },
+        {
+          "facet": "endpoint.os",
+          "name": "OS"
+        },
+        {
+          "facet": "src.process.name",
+          "name": "Process"
+        },
+        {
+          "facet": "src.process.user",
+          "name": "User"
+        },
+        {
+          "facet": "event.dns.responseCode",
+          "name": "DNS Response Code"
+        },
+        {
+          "facet": "event.dns.transportProtocol",
+          "name": "DNS Transport"
+        },
+        {
+          "facet": "event.dns.protocol",
+          "name": "DNS Protocol"
+        },
+        {
+          "facet": "event.dns.provider",
+          "name": "DNS Provider"
+        }
+      ],
+      "graphs": [
+        {
+          "title": "Long-Request Tunnel Candidates",
+          "description": "Requests >=100 characters; requires contextual validation.",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.request)) | let RequestLength = len(event.dns.request) | filter RequestLength >= 100 | group Events = count()",
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Encoded-Like Tunnel Candidates",
+          "description": "",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.request) AND event.dns.request matches \".*([A-Fa-f0-9]{32,}|[A-Za-z2-7]{40,})\\..*\") | group Events = count()",
+          "layout": {
+            "x": 10,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "5-Minute DNS Burst Buckets",
+          "description": "NeverOff heuristic: >=100 DNS events from one endpoint/process within 5 minutes.",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\") | group DNS_Events = count(), Domains = estimate_distinct(event.dns.request) by timestamp = timebucket('5 minutes'), endpoint.name, src.process.name | filter DNS_Events >= 100 | group BurstBuckets = count()",
+          "layout": {
+            "x": 20,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "15-Min High-Unique Buckets",
+          "description": "NeverOff heuristic: >=50 distinct requested domains from one endpoint/process in 15 minutes.",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.request)) | group DNS_Events = count(), UniqueDomains = estimate_distinct(event.dns.request) by timestamp = timebucket('15 minutes'), endpoint.name, src.process.name | filter UniqueDomains >= 50 | group Buckets = count()",
+          "layout": {
+            "x": 30,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "High Process DNS Count Events",
+          "description": "Events where the source-process DNS counter is at least 300.",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND src.process.dnsCount >= 300) | group Events = count()",
+          "layout": {
+            "x": 40,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Long DNS Responses ≥200",
+          "description": "Large DNS response strings; investigate for complex records, security tooling, or possible data-channel behavior.",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.response)) | let ResponseLength = len(event.dns.response) | filter ResponseLength >= 200 | group Events = count()",
+          "layout": {
+            "x": 50,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "DNS Burst Candidate Timeline",
+          "description": "Count of endpoint/process burst candidates by 5-minute bucket.",
+          "graphStyle": "line",
+          "query": "| filter(event.category == \"dns\")\n| group DNS_Events = count() by timestamp = timebucket('5 minutes'), endpoint.name, src.process.name\n| filter DNS_Events >= 100\n| group BurstCandidates = count() by timestamp",
+          "layout": {
+            "x": 0,
+            "y": 7,
+            "w": 60,
+            "h": 10
+          },
+          "lineSmoothing": "straightLines",
+          "plotNulls": "gaps",
+          "xAxis": "time",
+          "yScale": "linear"
+        },
+        {
+          "title": "High-Volume DNS Burst Candidates",
+          "description": "Endpoint/process buckets with at least 100 DNS events in 5 minutes.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\") | group DNS_Events = count(), UniqueDomains = estimate_distinct(event.dns.request) by timestamp = timebucket('5 minutes'), endpoint.name, site.name, src.process.name, src.process.user | filter DNS_Events >= 100 | sort -DNS_Events | limit 100",
+          "layout": {
+            "x": 0,
+            "y": 17,
+            "w": 30,
+            "h": 17
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "High Unique-Domain Candidates",
+          "description": "Endpoint/process buckets with at least 50 distinct domains in 15 minutes.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.request)) | group DNS_Events = count(), UniqueDomains = estimate_distinct(event.dns.request) by timestamp = timebucket('15 minutes'), endpoint.name, site.name, src.process.name | filter UniqueDomains >= 50 | sort -UniqueDomains | limit 100",
+          "layout": {
+            "x": 30,
+            "y": 17,
+            "w": 30,
+            "h": 17
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "Process DNS Counter Ranking",
+          "description": "Ranks processes by the maximum observed src.process.dnsCount.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND !isempty(src.process.name)) | group Events = count(), MaxProcessDnsCount = max(src.process.dnsCount), Domains = estimate_distinct(event.dns.request), Endpoints = estimate_distinct(endpoint.name) by src.process.name | sort -MaxProcessDnsCount | limit 75",
+          "layout": {
+            "x": 0,
+            "y": 34,
+            "w": 30,
+            "h": 17
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "Long / Encoded Request Evidence",
+          "description": "Raw evidence for long or encoded-like DNS requests.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.request)) | let RequestLength = len(event.dns.request) | filter(RequestLength >= 100 OR event.dns.request matches \".*([A-Fa-f0-9]{32,}|[A-Za-z2-7]{40,})\\..*\") | columns event.time, site.name, endpoint.name, endpoint.os, src.process.user, src.process.name, src.process.cmdline, src.process.dnsCount, RequestLength, event.dns.request, event.dns.response, event.dns.responseCode, event.dns.transportProtocol | sort -event.time | limit 200",
+          "layout": {
+            "x": 30,
+            "y": 34,
+            "w": 30,
+            "h": 17
+          }
+        },
+        {
+          "title": "Endpoint → Process → Tunnel Candidate Domain",
+          "description": "Flow view for long/encoded DNS tunnel candidates.",
+          "graphStyle": "sankey",
+          "sankeyColorScheme": "default",
+          "showNodeValues": "true",
+          "colorMatching": "automatic",
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.request))\n| let RequestLength = len(event.dns.request)\n| filter(RequestLength >= 100 OR event.dns.request matches \".*([A-Fa-f0-9]{32,}|[A-Za-z2-7]{40,})\\..*\")\n| let Host = \"Endpoint: \" + endpoint.name\n| let Proc = src.process.name != null ? \"Process: \" + src.process.name : \"Process: Unattributed/System\"\n| let Domain = \"Candidate: \" + event.dns.request\n| group c = count() by Host, Proc, Domain\n| sort -c\n| limit 45\n| let link = array(0,1).expand()\n| let source = link == 0 ? Host : Proc\n| let target = link == 0 ? Proc : Domain\n| group c = sum(c) by source, target\n| columns source, target, c",
+          "layout": {
+            "x": 0,
+            "y": 51,
+            "w": 60,
+            "h": 17
+          }
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    },
+    {
+      "tabName": "Threat Intelligence",
+      "filters": [
+        {
+          "facet": "site.name",
+          "name": "Site"
+        },
+        {
+          "facet": "endpoint.name",
+          "name": "Endpoint"
+        },
+        {
+          "facet": "src.process.name",
+          "name": "Process"
+        },
+        {
+          "facet": "tiIndicator.type",
+          "name": "IOC Type"
+        },
+        {
+          "facet": "tiIndicator.source",
+          "name": "IOC Source"
+        },
+        {
+          "facet": "tiIndicator.value",
+          "name": "IOC Value"
+        }
+      ],
+      "graphs": [
+        {
+          "title": "Threat Intelligence IOC Hits",
+          "description": "",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"threat_intelligence_indicators\") | group IOC_Hits = count()",
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Endpoints with IOC Hits",
+          "description": "",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"threat_intelligence_indicators\") | group Endpoints = estimate_distinct(endpoint.name)",
+          "layout": {
+            "x": 10,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Distinct IOC Values",
+          "description": "",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"threat_intelligence_indicators\" AND !isempty(tiIndicator.value)) | group IOCs = estimate_distinct(tiIndicator.value)",
+          "layout": {
+            "x": 20,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "High Threat Score IOC Hits ≥95",
+          "description": "",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"threat_intelligence_indicators\" AND event.externalThreatValue >= 95) | group IOC_Hits = count()",
+          "layout": {
+            "x": 30,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Threat Actors Observed",
+          "description": "",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"threat_intelligence_indicators\" AND tiIndicator.threatActors = *) | group ThreatActors = estimate_distinct(tiIndicator.threatActors)",
+          "layout": {
+            "x": 40,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Malware Names Observed",
+          "description": "",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"threat_intelligence_indicators\" AND tiIndicator.malwareNames = *) | group MalwareNames = estimate_distinct(tiIndicator.malwareNames)",
+          "layout": {
+            "x": 50,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Threat Intelligence Hits Over Time",
+          "description": "Threat Intelligence event trend.",
+          "graphStyle": "line",
+          "query": "| filter(event.category == \"threat_intelligence_indicators\") | group IOC_Hits = count() by timestamp = timebucket('1 hour')",
+          "layout": {
+            "x": 0,
+            "y": 7,
+            "w": 60,
+            "h": 10
+          },
+          "lineSmoothing": "straightLines",
+          "plotNulls": "gaps",
+          "xAxis": "time",
+          "yScale": "linear"
+        },
+        {
+          "title": "Threat Intelligence Sources",
+          "description": "IOC hits by intelligence source.",
+          "graphStyle": "donut",
+          "dataLabelType": "PERCENTAGE",
+          "maxPieSlices": 12,
+          "query": "| filter(event.category == \"threat_intelligence_indicators\") | group IOC_Hits = count() by tiIndicator.source | sort -IOC_Hits",
+          "layout": {
+            "x": 0,
+            "y": 17,
+            "w": 15,
+            "h": 14
+          }
+        },
+        {
+          "title": "IOC Types",
+          "description": "Observed threat-intelligence indicator types.",
+          "graphStyle": "donut",
+          "dataLabelType": "PERCENTAGE",
+          "maxPieSlices": 15,
+          "query": "| filter(event.category == \"threat_intelligence_indicators\") | group IOC_Hits = count() by tiIndicator.type | sort -IOC_Hits",
+          "layout": {
+            "x": 15,
+            "y": 17,
+            "w": 15,
+            "h": 14
+          }
+        },
+        {
+          "title": "Top IOC Values",
+          "description": "Top matched IOC values across all TI types.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"threat_intelligence_indicators\") | group IOC_Hits = count(), Endpoints = estimate_distinct(endpoint.name), Processes = estimate_distinct(src.process.name) by tiIndicator.value, tiIndicator.type, tiIndicator.source | sort -IOC_Hits | limit 50",
+          "layout": {
+            "x": 30,
+            "y": 17,
+            "w": 30,
+            "h": 14
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "Top Threat Actors",
+          "description": "Threat actors associated with observed TI events.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"threat_intelligence_indicators\" AND tiIndicator.threatActors = *) | group IOC_Hits = count(), IOC_Values = estimate_distinct(tiIndicator.value), Endpoints = estimate_distinct(endpoint.name) by tiIndicator.threatActors | sort -IOC_Hits | limit 50",
+          "layout": {
+            "x": 0,
+            "y": 31,
+            "w": 20,
+            "h": 16
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "Top Malware Names",
+          "description": "Malware names associated with IOC hits.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"threat_intelligence_indicators\" AND tiIndicator.malwareNames = *) | group IOC_Hits = count(), IOC_Values = estimate_distinct(tiIndicator.value), Endpoints = estimate_distinct(endpoint.name) by tiIndicator.malwareNames | sort -IOC_Hits | limit 50",
+          "layout": {
+            "x": 20,
+            "y": 31,
+            "w": 20,
+            "h": 16
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "Endpoints with Threat Intelligence Hits",
+          "description": "Endpoints ranked by TI hit volume.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"threat_intelligence_indicators\") | group IOC_Hits = count(), IOC_Values = estimate_distinct(tiIndicator.value), IOC_Types = estimate_distinct(tiIndicator.type), Processes = estimate_distinct(src.process.name) by endpoint.name, endpoint.os, site.name | sort -IOC_Hits | limit 75",
+          "layout": {
+            "x": 40,
+            "y": 31,
+            "w": 20,
+            "h": 16
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "High Threat Score IOC Evidence",
+          "description": "Raw high-threat-score IOC events. Validate context before escalation.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"threat_intelligence_indicators\" AND event.externalThreatValue >= 95) | columns event.time, site.name, endpoint.name, endpoint.os, src.process.user, src.process.name, src.process.cmdline, tiIndicator.value, tiIndicator.type, tiIndicator.source, tiIndicator.malwareNames, tiIndicator.threatActors, event.externalThreatValue | sort -event.externalThreatValue | limit 200",
+          "layout": {
+            "x": 0,
+            "y": 47,
+            "w": 60,
+            "h": 17
+          }
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    },
+    {
+      "tabName": "Endpoint & Process Intelligence",
+      "filters": [
+        {
+          "facet": "site.name",
+          "name": "Site"
+        },
+        {
+          "facet": "endpoint.name",
+          "name": "Endpoint"
+        },
+        {
+          "facet": "endpoint.os",
+          "name": "OS"
+        },
+        {
+          "facet": "src.process.name",
+          "name": "Process"
+        },
+        {
+          "facet": "src.process.user",
+          "name": "User"
+        },
+        {
+          "facet": "event.dns.responseCode",
+          "name": "DNS Response Code"
+        },
+        {
+          "facet": "event.dns.transportProtocol",
+          "name": "DNS Transport"
+        },
+        {
+          "facet": "event.dns.protocol",
+          "name": "DNS Protocol"
+        },
+        {
+          "facet": "event.dns.provider",
+          "name": "DNS Provider"
+        }
+      ],
+      "graphs": [
+        {
+          "title": "User-Attributed DNS Events",
+          "description": "",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND !isempty(src.process.user) AND !(src.process.user contains:anycase(\"NT AUTHORITY\"))) | group Events = count()",
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Non-System Resolver Process Events",
+          "description": "DNS telemetry excluding common resolver/system processes.",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND !(src.process.name in:anycase(\"svchost.exe\",\"mDNSResponder\",\"systemd-resolved\",\"dnsmasq\"))) | group Events = count()",
+          "layout": {
+            "x": 10,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "High DNS-Count Process Events",
+          "description": "",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND src.process.dnsCount >= 300) | group Events = count()",
+          "layout": {
+            "x": 20,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Processes Querying High-Abuse TLDs",
+          "description": "",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND (event.dns.request contains:anycase(\".xyz\",\".top\",\".pw\",\".gq\",\".ga\",\".cf\",\".tk\")) AND !isempty(src.process.name)) | group Processes = estimate_distinct(src.process.name)",
+          "layout": {
+            "x": 30,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Processes Generating NXDOMAIN",
+          "description": "",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND event.dns.responseCode == 3 AND !isempty(src.process.name)) | group Processes = estimate_distinct(src.process.name)",
+          "layout": {
+            "x": 40,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Processes Querying Monitored Infrastructure",
+          "description": "",
+          "graphStyle": "number",
+          "query": "| filter(event.category == \"dns\" AND (event.dns.request contains:anycase(\"duckdns.org\",\"no-ip.com\",\"no-ip.org\",\"hopto.org\",\"ddns.net\",\"dynu.net\",\"freedns.afraid.org\",\"serveftp.com\",\"servehttp.com\",\"sytes.net\",\"ngrok.io\",\"ngrok.app\",\"trycloudflare.com\",\"loca.lt\",\"serveo.net\",\"localhost.run\",\"bore.pub\",\"pastebin.com\",\"paste.ee\",\"paste.rs\",\"raw.githubusercontent.com\",\"githubusercontent.com\",\"cdn.discordapp.com\",\"discordapp.com\",\"discord.com\",\"transfer.sh\",\"catbox.moe\",\"gofile.io\",\"dns.google\",\"cloudflare-dns.com\",\"mozilla.cloudflare-dns.com\",\"dns.quad9.net\",\"doh.opendns.com\",\"dns.nextdns.io\",\"adguard-dns.com\")) AND !isempty(src.process.name)) | group Processes = estimate_distinct(src.process.name)",
+          "layout": {
+            "x": 50,
+            "y": 0,
+            "w": 10,
+            "h": 7
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Top DNS Processes",
+          "description": "Process-centric DNS baseline.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND !isempty(src.process.name)) | group DNS_Events = count(), Domains = estimate_distinct(event.dns.request), Endpoints = estimate_distinct(endpoint.name), Users = estimate_distinct(src.process.user), MaxDnsCount = max(src.process.dnsCount) by src.process.name | sort -DNS_Events | limit 75",
+          "layout": {
+            "x": 0,
+            "y": 7,
+            "w": 30,
+            "h": 18
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "Top User-Driven DNS Activity",
+          "description": "User/security-context DNS baseline.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND !isempty(src.process.user) AND !(src.process.user contains:anycase(\"NT AUTHORITY\"))) | group DNS_Events = count(), Domains = estimate_distinct(event.dns.request), Processes = estimate_distinct(src.process.name), Endpoints = estimate_distinct(endpoint.name) by src.process.user | sort -DNS_Events | limit 75",
+          "layout": {
+            "x": 30,
+            "y": 7,
+            "w": 30,
+            "h": 18
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "High-Risk DNS Behavior by Endpoint / Process",
+          "description": "Consolidated endpoint/process ranking across several DNS triage signals.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.request))\n| let RequestLength = len(event.dns.request)\n| filter(event.dns.responseCode == 3 OR RequestLength >= 80 OR event.dns.request matches \".*([A-Fa-f0-9]{32,}|[A-Za-z2-7]{40,})\\..*\" OR (event.dns.request contains:anycase(\".xyz\",\".top\",\".pw\",\".gq\",\".ga\",\".cf\",\".tk\")) OR (event.dns.request contains:anycase(\"duckdns.org\",\"no-ip.com\",\"no-ip.org\",\"hopto.org\",\"ddns.net\",\"dynu.net\",\"freedns.afraid.org\",\"serveftp.com\",\"servehttp.com\",\"sytes.net\",\"ngrok.io\",\"ngrok.app\",\"trycloudflare.com\",\"loca.lt\",\"serveo.net\",\"localhost.run\",\"bore.pub\",\"pastebin.com\",\"paste.ee\",\"paste.rs\",\"raw.githubusercontent.com\",\"githubusercontent.com\",\"cdn.discordapp.com\",\"discordapp.com\",\"discord.com\",\"transfer.sh\",\"catbox.moe\",\"gofile.io\",\"dns.google\",\"cloudflare-dns.com\",\"mozilla.cloudflare-dns.com\",\"dns.quad9.net\",\"doh.opendns.com\",\"dns.nextdns.io\",\"adguard-dns.com\")))\n| group Events = count(), Domains = estimate_distinct(event.dns.request), NXDOMAIN = count(event.dns.responseCode == 3) by endpoint.name, site.name, src.process.name, src.process.user\n| sort -Events\n| limit 100",
+          "layout": {
+            "x": 0,
+            "y": 25,
+            "w": 60,
+            "h": 17
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "User → Process → Domain → Endpoint",
+          "description": "DNS attribution across user, process, requested domain and endpoint.",
+          "graphStyle": "sankey",
+          "sankeyColorScheme": "default",
+          "showNodeValues": "true",
+          "colorMatching": "automatic",
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.request))\n| let User = src.process.user != null ? \"User: \" + src.process.user : \"User: Unattributed\"\n| let Proc = src.process.name != null ? \"Process: \" + src.process.name : \"Process: Unattributed/System\"\n| let Domain = \"Domain: \" + event.dns.request\n| let Host = \"Endpoint: \" + endpoint.name\n| group c = count() by User, Proc, Domain, Host\n| sort -c\n| limit 40\n| let link = array(0,1,2).expand()\n| let source = link == 0 ? User : link == 1 ? Proc : Domain\n| let target = link == 0 ? Proc : link == 1 ? Domain : Host\n| group c = sum(c) by source, target\n| columns source, target, c",
+          "layout": {
+            "x": 0,
+            "y": 42,
+            "w": 60,
+            "h": 17
+          }
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    },
+    {
+      "tabName": "Investigation",
+      "filters": [
+        {
+          "facet": "site.name",
+          "name": "Site"
+        },
+        {
+          "facet": "endpoint.name",
+          "name": "Endpoint"
+        },
+        {
+          "facet": "endpoint.os",
+          "name": "OS"
+        },
+        {
+          "facet": "src.process.name",
+          "name": "Process"
+        },
+        {
+          "facet": "src.process.user",
+          "name": "User"
+        },
+        {
+          "facet": "event.dns.responseCode",
+          "name": "DNS Response Code"
+        },
+        {
+          "facet": "event.dns.transportProtocol",
+          "name": "DNS Transport"
+        },
+        {
+          "facet": "event.dns.protocol",
+          "name": "DNS Protocol"
+        },
+        {
+          "facet": "event.dns.provider",
+          "name": "DNS Provider"
+        }
+      ],
+      "graphs": [
+        {
+          "title": "Raw DNS Events",
+          "description": "Primary DNS evidence table.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\") | columns event.time, event.id, site.name, endpoint.name, endpoint.os, agent.uuid, src.process.user, src.process.name, src.process.image.path, src.process.cmdline, src.process.storyline.id, src.process.dnsCount, event.dns.request, event.dns.response, event.dns.responseCode, event.dns.protocol, event.dns.transportProtocol, event.dns.provider | sort -event.time | limit 300",
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 60,
+            "h": 18
+          }
+        },
+        {
+          "title": "Raw NXDOMAIN Events",
+          "description": "Raw NXDOMAIN evidence.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND event.dns.responseCode == 3) | columns event.time, site.name, endpoint.name, endpoint.os, src.process.user, src.process.name, src.process.image.path, src.process.cmdline, src.process.storyline.id, event.dns.request, event.dns.response, event.dns.responseCode | sort -event.time | limit 250",
+          "layout": {
+            "x": 0,
+            "y": 18,
+            "w": 60,
+            "h": 16
+          }
+        },
+        {
+          "title": "Raw Domain-Anomaly Events",
+          "description": "Raw long/encoded/deep-label/TLD-watchlist evidence.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.request))\n| let RequestLength = len(event.dns.request)\n| filter(RequestLength >= 80 OR event.dns.request matches \".*([A-Fa-f0-9]{32,}|[A-Za-z2-7]{40,})\\..*\" OR event.dns.request matches \"^([^.]+\\.){5,}[^.]+$\" OR (event.dns.request contains:anycase(\".xyz\",\".top\",\".pw\",\".gq\",\".ga\",\".cf\",\".tk\")) OR (event.dns.request contains:anycase(\".click\",\".work\",\".site\",\".online\",\".live\",\".icu\",\".buzz\",\".cam\",\".cyou\",\".monster\",\".quest\",\".sbs\")))\n| columns event.time, site.name, endpoint.name, endpoint.os, src.process.user, src.process.name, src.process.image.path, src.process.cmdline, src.process.storyline.id, src.process.dnsCount, RequestLength, event.dns.request, event.dns.response, event.dns.responseCode, event.dns.transportProtocol\n| sort -event.time\n| limit 250",
+          "layout": {
+            "x": 0,
+            "y": 34,
+            "w": 60,
+            "h": 16
+          }
+        },
+        {
+          "title": "Raw Monitored C2 / Abuse Infrastructure",
+          "description": "Raw events matching embedded dual-use infrastructure monitoring.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND ((event.dns.request contains:anycase(\"duckdns.org\",\"no-ip.com\",\"no-ip.org\",\"hopto.org\",\"ddns.net\",\"dynu.net\",\"freedns.afraid.org\",\"serveftp.com\",\"servehttp.com\",\"sytes.net\",\"ngrok.io\",\"ngrok.app\",\"trycloudflare.com\",\"loca.lt\",\"serveo.net\",\"localhost.run\",\"bore.pub\",\"pastebin.com\",\"paste.ee\",\"paste.rs\",\"raw.githubusercontent.com\",\"githubusercontent.com\",\"cdn.discordapp.com\",\"discordapp.com\",\"discord.com\",\"transfer.sh\",\"catbox.moe\",\"gofile.io\",\"dns.google\",\"cloudflare-dns.com\",\"mozilla.cloudflare-dns.com\",\"dns.quad9.net\",\"doh.opendns.com\",\"dns.nextdns.io\",\"adguard-dns.com\")) OR event.dns.request contains:anycase(\".onion\"))) | columns event.time, site.name, endpoint.name, endpoint.os, src.process.user, src.process.name, src.process.image.path, src.process.cmdline, src.process.storyline.id, event.dns.request, event.dns.response, event.dns.responseCode, event.dns.transportProtocol | sort -event.time | limit 250",
+          "layout": {
+            "x": 0,
+            "y": 50,
+            "w": 60,
+            "h": 16
+          }
+        },
+        {
+          "title": "Raw Threat Intelligence IOC Events",
+          "description": "Threat Intelligence evidence for cross-pivot investigation.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"threat_intelligence_indicators\") | columns event.time, site.name, endpoint.name, endpoint.os, src.process.user, src.process.name, src.process.cmdline, src.process.storyline.id, tiIndicator.value, tiIndicator.type, tiIndicator.source, tiIndicator.malwareNames, tiIndicator.threatActors, event.externalThreatValue, dataSource.name | sort -event.time | limit 250",
+          "layout": {
+            "x": 0,
+            "y": 66,
+            "w": 60,
+            "h": 16
+          }
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    },
+    {
+      "tabName": "Detection Engineering",
+      "filters": [
+        {
+          "facet": "site.name",
+          "name": "Site"
+        },
+        {
+          "facet": "endpoint.name",
+          "name": "Endpoint"
+        },
+        {
+          "facet": "endpoint.os",
+          "name": "OS"
+        },
+        {
+          "facet": "src.process.name",
+          "name": "Process"
+        },
+        {
+          "facet": "src.process.user",
+          "name": "User"
+        },
+        {
+          "facet": "event.dns.responseCode",
+          "name": "DNS Response Code"
+        },
+        {
+          "facet": "event.dns.transportProtocol",
+          "name": "DNS Transport"
+        },
+        {
+          "facet": "event.dns.protocol",
+          "name": "DNS Protocol"
+        },
+        {
+          "facet": "event.dns.provider",
+          "name": "DNS Provider"
+        }
+      ],
+      "graphs": [
+        {
+          "title": "Detection Engineering Guidance",
+          "graphStyle": "markdown",
+          "markdown": "# Detection Engineering Guidance\n\nUse this tab to validate stable patterns before converting them into **STAR Custom Rules, correlation rules, or SOC playbooks**.\n\n## High-signal single-event candidates\nThese can be evaluated at the event level after tuning:\n\n**Monitored TLD**\n`event.category = \"dns\" AND event.dns.request contains:anycase(\".xyz\",\".top\",\".pw\",\".gq\",\".ga\",\".cf\",\".tk\")`\n\n**Very long DNS request**\n`event.category = \"dns\" AND len(event.dns.request) >= 120`\n\n**Encoded-like DNS label**\nUse the dashboard's encoded-label regular expression after validating false positives in the tenant.\n\n**Monitored tunnel / relay infrastructure**\nUse the embedded tunnel/relay domain list only when the client policy makes those services unauthorized or when additional suspicious context is present.\n\n## Correlation / aggregation candidates\nThese should not be converted blindly into single-event STAR rules:\n\n- `>=100` DNS events by endpoint + process in 5 minutes.\n- `>=50` unique requested domains by endpoint + process in 15 minutes.\n- High NXDOMAIN diversity from one endpoint/process.\n- Repeated lookups to one domain from the same process across multiple time buckets.\n- Long/encoded DNS requests plus suspicious process context.\n- DNS anomaly + IP Connect to newly observed infrastructure.\n- DNS anomaly + Threat Intelligence IOC hit on the same endpoint/process/time window.\n\n## Recommended response posture\nStart with **Alert Only**. After validation, use process termination or Network Quarantine only when the complete Storyline and incident context justify containment.\n\n## Tuning priorities\nExclude or baseline:\n- EDR/security products.\n- browsers and enterprise updaters where appropriate.\n- DNS resolver services.\n- cloud/identity agents.\n- VPN/ZTNA clients.\n- telemetry and observability agents.\n- approved Dynamic DNS / tunnel services.\n- authorized developer tooling.\n\nThe objective is high signal-to-noise, not maximum event volume.\n",
+          "description": "",
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 60,
+            "h": 26
+          }
+        },
+        {
+          "title": "Candidate Rule — Very Long DNS Requests",
+          "description": "Baseline very-long-request candidates before alerting.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND !isempty(event.dns.request)) | let RequestLength = len(event.dns.request) | filter RequestLength >= 120 | group Events = count(), Endpoints = estimate_distinct(endpoint.name), Processes = estimate_distinct(src.process.name) by event.dns.request, RequestLength | sort -Events | limit 100",
+          "layout": {
+            "x": 0,
+            "y": 26,
+            "w": 30,
+            "h": 16
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "Candidate Rule — Monitored TLDs",
+          "description": "Baseline policy-defined TLD monitoring before alerting.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND ((event.dns.request contains:anycase(\".xyz\",\".top\",\".pw\",\".gq\",\".ga\",\".cf\",\".tk\")) OR (event.dns.request contains:anycase(\".click\",\".work\",\".site\",\".online\",\".live\",\".icu\",\".buzz\",\".cam\",\".cyou\",\".monster\",\".quest\",\".sbs\")))) | group Events = count(), Endpoints = estimate_distinct(endpoint.name), Processes = estimate_distinct(src.process.name) by event.dns.request | sort -Events | limit 100",
+          "layout": {
+            "x": 30,
+            "y": 26,
+            "w": 30,
+            "h": 16
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "Candidate Correlation — DNS Burst",
+          "description": "Aggregation candidate for correlation-rule design.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\") | group DNS_Events = count(), UniqueDomains = estimate_distinct(event.dns.request) by timestamp = timebucket('5 minutes'), endpoint.name, src.process.name | filter DNS_Events >= 100 | sort -DNS_Events | limit 100",
+          "layout": {
+            "x": 0,
+            "y": 42,
+            "w": 30,
+            "h": 16
+          },
+          "showBarsColumn": "true"
+        },
+        {
+          "title": "Candidate Correlation — NXDOMAIN Diversity",
+          "description": "DGA-oriented aggregation candidate; validate stale software and blocking infrastructure first.",
+          "graphStyle": "",
+          "query": "| filter(event.category == \"dns\" AND event.dns.responseCode == 3 AND !isempty(event.dns.request)) | group Failures = count(), UniqueFailedDomains = estimate_distinct(event.dns.request) by endpoint.name, src.process.name | filter Failures >= 30 AND UniqueFailedDomains >= 20 | sort -UniqueFailedDomains | limit 100",
+          "layout": {
+            "x": 30,
+            "y": 42,
+            "w": 30,
+            "h": 16
+          },
+          "showBarsColumn": "true"
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    }
+  ]
+}
