@@ -1,0 +1,10 @@
+metadata_details:
+  data_dependencies: 'SentinelOne IP Connect events and geo_ip_country() support in PowerQuery'
+  required_fields: 'event.type, event.time, event.id, event.network.connectionStatus, event.network.direction, event.network.protocolName, src.ip.address, src.port.number, dst.ip.address, dst.port.number, src.process.name, src.process.displayName, src.process.cmdline, src.process.image.path, src.process.publisher, src.process.storyline.id, src.process.uid, src.process.user, endpoint.name, endpoint.os, site.name, site.id, agent.uuid'
+  description: 'All-country network visibility, inbound/outbound connections, geography, exposure, ports, and process attribution. Country lists and priority models are policy-defined and require local review.'
+  usecase_type: 'Security'
+  usecase_action: 'Dashboard'
+  tags: 'sentinelone, threat-hunting, network, geolocation, exposure'
+  version: 'v2.0'
+  author: 'NeverOff Technology — Threat Detection Engineering Division; community maintainer RM-ReactorHunt'
+  validation_status: 'Static validation only; tenant import and query execution not independently verified for this release.'

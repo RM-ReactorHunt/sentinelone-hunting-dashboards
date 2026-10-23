@@ -1,0 +1,1640 @@
+{
+  "version": "1.0.0",
+  "configType": "TABBED",
+  "description": "V2 — Advanced SentinelOne Singularity Data Lake / AI SIEM dashboard for global IP connection intelligence, all-country traffic visibility, geographic attribution, inbound exposure, outbound communications, protocols, ports, endpoint/process attribution, and policy-defined restricted/elevated-risk geographies.",
+  "tabs": [
+    {
+      "tabName": "Readme",
+      "graphs": [
+        {
+          "title": "Readme",
+          "graphStyle": "markdown",
+          "markdown": "# Global Network Intelligence — Geo Connections & Exposure | V2\n\nThis dashboard turns **SentinelOne IP Connect telemetry** into an analyst-focused network intelligence view for SOC operations.\n\n## Primary use cases\n- Identify **outbound connections** by destination country, remote IP, protocol, port, endpoint, process, and user.\n- Identify **inbound connections** by source country, source IP, destination endpoint, service port, and process.\n- Provide **all-country traffic visibility** across every geolocatable remote country observed in the selected time range.\n- Rank countries, IPs, endpoints, processes, users, protocols, and ports by observed connection volume.\n- Investigate policy-defined restricted/elevated-risk geographies.\n- Surface network activity involving **remote administration, lateral-movement, database, and other security-sensitive service ports**.\n- Pivot from geography → endpoint → process through Sankey visualizations.\n- Provide raw event tables for investigation and evidence collection.\n\n## Important interpretation notes\n- Country attribution is derived from public IP geolocation using `geo_ip_country()`.\n- Private, loopback, link-local, or otherwise non-geolocatable addresses may not produce a country value.\n- NAT, proxies, VPNs, CDNs, cloud egress, and security gateways can change the apparent country associated with a connection.\n- A connection to a restricted or monitored country is **not by itself evidence of malicious activity**. Geography is a policy/risk signal that requires endpoint, process, port, user, and Storyline context.\n- Event counts are connection-event counts, not guaranteed unique TCP/UDP sessions.\n- This dashboard is based primarily on `event.type == \"IP Connect\"` telemetry collected by SentinelOne-protected endpoints.\n\n## V2 policy-defined restricted / elevated-risk geographies\nThe **Restricted Geographies** tab monitors the following country set:\n\n**Tier 1 — Persistent state-sponsored / strategic cyber threat focus**\n- Russia\n- China\n- Iran\n- North Korea / DPRK\n- Belarus\n\n**Tier 2 — Elevated APT monitoring / client risk policy**\n- India\n- Pakistan\n- Vietnam\n\nThe list is intentionally policy-driven and can be customized per client. Country-level monitoring should not be interpreted as attribution of individual traffic to a threat actor.\n\n## V2 all-country visibility\nThe **Geo Intelligence** tab includes an **All Countries — Unified Traffic Matrix**. It groups all geolocatable inbound and outbound IP Connect events by remote country and direction, including connection volume, unique remote IPs, endpoints, processes, protocols, and observed ports.\n\n## Analytic Priority model\nThe Restricted Geographies tab includes a **custom analytic score** for triage. This is not a SentinelOne threat score:\n- +50: Tier 1 restricted geography\n- +35: Tier 2 elevated-monitoring geography\n- +30: security-sensitive destination/service port\n- +20: script interpreter / LOLBin / command-line utility process\n\nThe score is intended only to prioritize analyst review.\n\n## V2 query compatibility fix\nThe **Monitored Geography Activity Over Time** visualization uses a full Power Query with `timebucket()` and `transpose` instead of dashboard regular-search plot filters. This avoids using `geo_ip_country()` in a regular-search plot filter, where that function is not supported.\n\nDeveloped by the Threat Detection Engineering Division at NeverOff Technology (SentinelOne Division)\nDominican Republic",
+          "description": "",
+          "layout": {
+            "h": 34,
+            "w": 60,
+            "x": 0,
+            "y": 0
+          }
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    },
+    {
+      "tabName": "Global Overview",
+      "filters": [
+        {
+          "facet": "site.name",
+          "name": "Site"
+        },
+        {
+          "facet": "endpoint.name",
+          "name": "Endpoint"
+        },
+        {
+          "facet": "endpoint.os",
+          "name": "OS"
+        },
+        {
+          "facet": "event.network.direction",
+          "name": "Direction"
+        },
+        {
+          "facet": "event.network.protocolName",
+          "name": "Protocol"
+        },
+        {
+          "facet": "src.process.name",
+          "name": "Process"
+        }
+      ],
+      "graphs": [
+        {
+          "title": "Total IP Connect Events",
+          "description": "Total IP Connect telemetry in the selected time range.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"IP Connect\") | group Connections = count()",
+          "layout": {
+            "h": 7,
+            "w": 10,
+            "x": 0,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Outbound Connections",
+          "description": "Connections initiated by protected endpoints.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"OUTGOING\") | group Connections = count()",
+          "layout": {
+            "h": 7,
+            "w": 10,
+            "x": 10,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Inbound Connections",
+          "description": "Connections observed as incoming to protected endpoints.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"INCOMING\") | group Connections = count()",
+          "layout": {
+            "h": 7,
+            "w": 10,
+            "x": 20,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Distinct Remote Countries",
+          "description": "Distinct geolocated remote countries observed.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction in (\"OUTGOING\",\"INCOMING\")) | let RemoteCountry = event.network.direction == \"OUTGOING\" ? geo_ip_country(dst.ip.address) : geo_ip_country(src.ip.address) | filter !isempty(RemoteCountry) | group Countries = estimate_distinct(RemoteCountry)",
+          "layout": {
+            "h": 7,
+            "w": 10,
+            "x": 30,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Distinct Remote Public IPs",
+          "description": "Distinct remote IPs for which country geolocation is available.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction in (\"OUTGOING\",\"INCOMING\")) | let RemoteIP = event.network.direction == \"OUTGOING\" ? dst.ip.address : src.ip.address | let RemoteCountry = geo_ip_country(RemoteIP) | filter !isempty(RemoteCountry) | group RemoteIPs = estimate_distinct(RemoteIP)",
+          "layout": {
+            "h": 7,
+            "w": 10,
+            "x": 40,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Endpoints with Network Activity",
+          "description": "Protected endpoints generating IP Connect telemetry.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"IP Connect\") | group Endpoints = estimate_distinct(endpoint.name)",
+          "layout": {
+            "h": 7,
+            "w": 10,
+            "x": 50,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Network Connections Over Time",
+          "description": "Outbound and inbound IP Connect activity over the selected time range.",
+          "graphStyle": "line",
+          "plots": [
+            {
+              "filter": "event.type='IP Connect' and event.network.direction='OUTGOING'",
+              "label": "Outbound"
+            },
+            {
+              "filter": "event.type='IP Connect' and event.network.direction='INCOMING'",
+              "label": "Inbound"
+            }
+          ],
+          "layout": {
+            "h": 10,
+            "w": 60,
+            "x": 0,
+            "y": 7
+          },
+          "lineSmoothing": "straightLines",
+          "plotNulls": "gaps"
+        },
+        {
+          "title": "Connection Direction",
+          "description": "Distribution of IP Connect events by direction.",
+          "graphStyle": "donut",
+          "dataLabelType": "PERCENTAGE",
+          "maxPieSlices": 6,
+          "query": "| filter(event.type == \"IP Connect\") | group Connections = count() by event.network.direction | sort -Connections",
+          "layout": {
+            "h": 14,
+            "w": 15,
+            "x": 0,
+            "y": 17
+          }
+        },
+        {
+          "title": "Network Protocols",
+          "description": "Observed protocol distribution across IP Connect telemetry.",
+          "graphStyle": "donut",
+          "dataLabelType": "PERCENTAGE",
+          "maxPieSlices": 10,
+          "query": "| filter(event.type == \"IP Connect\") | group Connections = count() by event.network.protocolName | sort -Connections",
+          "layout": {
+            "h": 14,
+            "w": 15,
+            "x": 15,
+            "y": 17
+          }
+        },
+        {
+          "title": "Connection Status",
+          "description": "Distribution of connection status values reported by endpoint telemetry.",
+          "graphStyle": "donut",
+          "dataLabelType": "PERCENTAGE",
+          "maxPieSlices": 10,
+          "query": "| filter(event.type == \"IP Connect\") | group Connections = count() by event.network.connectionStatus | sort -Connections",
+          "layout": {
+            "h": 14,
+            "w": 15,
+            "x": 30,
+            "y": 17
+          }
+        },
+        {
+          "title": "Top Remote Countries",
+          "description": "Highest-volume geolocated remote countries across inbound and outbound connections.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction in (\"OUTGOING\",\"INCOMING\")) | let RemoteCountry = event.network.direction == \"OUTGOING\" ? geo_ip_country(dst.ip.address) : geo_ip_country(src.ip.address) | filter !isempty(RemoteCountry) | group Connections = count() by RemoteCountry | sort -Connections | limit 15",
+          "layout": {
+            "h": 14,
+            "w": 15,
+            "x": 45,
+            "y": 17
+          }
+        },
+        {
+          "title": "Top Sites by Network Activity",
+          "description": "Sites producing the most IP Connect telemetry.",
+          "graphStyle": "stacked_bar",
+          "query": "| filter(event.type == \"IP Connect\") | group Connections = count() by site.name | sort -Connections | limit 20",
+          "xAxis": "grouped_data",
+          "yScale": "linear",
+          "numBars": "20",
+          "layout": {
+            "h": 14,
+            "w": 30,
+            "x": 0,
+            "y": 31
+          }
+        },
+        {
+          "title": "Top Endpoints by Network Activity",
+          "description": "Endpoints ranked by IP Connect event volume.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\") | group Connections = count(), RemoteIPs = estimate_distinct(dst.ip.address) by endpoint.name, endpoint.os, site.name | sort -Connections | limit 20",
+          "layout": {
+            "h": 14,
+            "w": 30,
+            "x": 30,
+            "y": 31
+          }
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    },
+    {
+      "tabName": "Geo Intelligence",
+      "filters": [
+        {
+          "facet": "site.name",
+          "name": "Site"
+        },
+        {
+          "facet": "endpoint.name",
+          "name": "Endpoint"
+        },
+        {
+          "facet": "endpoint.os",
+          "name": "OS"
+        },
+        {
+          "facet": "event.network.direction",
+          "name": "Direction"
+        },
+        {
+          "facet": "event.network.protocolName",
+          "name": "Protocol"
+        },
+        {
+          "facet": "src.process.name",
+          "name": "Process"
+        }
+      ],
+      "graphs": [
+        {
+          "title": "Top Outbound Destination Countries",
+          "description": "Countries receiving the most outbound connections from protected endpoints.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"OUTGOING\") | let DestinationCountry = geo_ip_country(dst.ip.address) | filter !isempty(DestinationCountry) | group Connections = count(), DistinctRemoteIPs = estimate_distinct(dst.ip.address), Endpoints = estimate_distinct(endpoint.name), Processes = estimate_distinct(src.process.name) by DestinationCountry | sort -Connections | limit 30",
+          "layout": {
+            "h": 16,
+            "w": 30,
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "title": "Top Inbound Source Countries",
+          "description": "Countries associated with the source IPs of incoming connections.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"INCOMING\") | let SourceCountry = geo_ip_country(src.ip.address) | filter !isempty(SourceCountry) | group Connections = count(), DistinctSourceIPs = estimate_distinct(src.ip.address), Endpoints = estimate_distinct(endpoint.name) by SourceCountry | sort -Connections | limit 30",
+          "layout": {
+            "h": 16,
+            "w": 30,
+            "x": 30,
+            "y": 0
+          }
+        },
+        {
+          "title": "Outbound Country Distribution",
+          "description": "Percentage distribution of outbound connections by destination country.",
+          "graphStyle": "donut",
+          "dataLabelType": "PERCENTAGE",
+          "maxPieSlices": 12,
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"OUTGOING\") | let DestinationCountry = geo_ip_country(dst.ip.address) | filter !isempty(DestinationCountry) | group Connections = count() by DestinationCountry | sort -Connections",
+          "layout": {
+            "h": 15,
+            "w": 20,
+            "x": 0,
+            "y": 16
+          }
+        },
+        {
+          "title": "Inbound Country Distribution",
+          "description": "Percentage distribution of incoming connections by source country.",
+          "graphStyle": "donut",
+          "dataLabelType": "PERCENTAGE",
+          "maxPieSlices": 12,
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"INCOMING\") | let SourceCountry = geo_ip_country(src.ip.address) | filter !isempty(SourceCountry) | group Connections = count() by SourceCountry | sort -Connections",
+          "layout": {
+            "h": 15,
+            "w": 20,
+            "x": 20,
+            "y": 16
+          }
+        },
+        {
+          "title": "Country Activity by Endpoint",
+          "description": "Endpoints and remote countries ranked by observed connection volume.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction in (\"OUTGOING\",\"INCOMING\")) | let RemoteCountry = event.network.direction == \"OUTGOING\" ? geo_ip_country(dst.ip.address) : geo_ip_country(src.ip.address) | filter !isempty(RemoteCountry) | group Connections = count() by endpoint.name, RemoteCountry, event.network.direction | sort -Connections | limit 40",
+          "layout": {
+            "h": 15,
+            "w": 20,
+            "x": 40,
+            "y": 16
+          }
+        },
+        {
+          "title": "Geo Flow — Country → Endpoint → Process",
+          "description": "Sankey view showing which remote countries connect with which endpoints and which local processes are associated with the activity.",
+          "graphStyle": "sankey",
+          "sankeyColorScheme": "default",
+          "showNodeValues": "true",
+          "colorMatching": "automatic",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction in (\"OUTGOING\",\"INCOMING\")) | let country = event.network.direction == \"OUTGOING\" ? geo_ip_country(dst.ip.address) : geo_ip_country(src.ip.address) | filter !isempty(country) | let host = \"💻 \" + endpoint.name | let proc = src.process.name != null ? \"⚙️ \" + src.process.name : \"⚙️ System/Kernel\" | group c = count() by country, host, proc | sort -c | limit 60 | let link = array(0,1,2).expand() | let source = link == 0 ? \"🌐 Global Network\" : link == 1 ? country : host | let target = link == 0 ? country : link == 1 ? host : proc | group c = sum(c) by source, target | columns source, target, c",
+          "layout": {
+            "h": 18,
+            "w": 60,
+            "x": 0,
+            "y": 31
+          }
+        },
+        {
+          "title": "Top Remote IPs with Geographic Context",
+          "description": "Remote IPs ranked by connection volume with direction, country, ports, and endpoint reach.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction in (\"OUTGOING\",\"INCOMING\")) | let RemoteIP = event.network.direction == \"OUTGOING\" ? dst.ip.address : src.ip.address | let RemoteCountry = geo_ip_country(RemoteIP) | filter !isempty(RemoteCountry) | group Connections = count(), Endpoints = estimate_distinct(endpoint.name), Ports = array_agg_distinct(dst.port.number) by RemoteCountry, RemoteIP, event.network.direction | let DistinctPorts = array_to_string(Ports, \", \") | columns RemoteCountry, RemoteIP, event.network.direction, Endpoints, DistinctPorts, Connections | sort -Connections | limit 100",
+          "layout": {
+            "h": 18,
+            "w": 60,
+            "x": 0,
+            "y": 49
+          }
+        },
+        {
+          "title": "All Countries — Unified Traffic Matrix",
+          "graphStyle": "",
+          "description": "Complete country-level traffic matrix across all geolocatable inbound and outbound IP Connect events. No country allowlist/restricted-list filter is applied.",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction in (\"OUTGOING\",\"INCOMING\"))\n| let RemoteIP = event.network.direction == \"OUTGOING\" ? dst.ip.address : src.ip.address\n| let RemoteCountry = geo_ip_country(RemoteIP)\n| filter !isempty(RemoteCountry)\n| group Connections = count(), UniqueRemoteIPs = estimate_distinct(RemoteIP), Endpoints = estimate_distinct(endpoint.name), Processes = estimate_distinct(src.process.name), ProtocolsArray = array_agg_distinct(event.network.protocolName), PortsArray = array_agg_distinct(dst.port.number) by RemoteCountry, event.network.direction\n| let Protocols = array_to_string(ProtocolsArray, \", \")\n| let Ports = array_to_string(PortsArray, \", \")\n| columns RemoteCountry, event.network.direction, Connections, UniqueRemoteIPs, Endpoints, Processes, Protocols, Ports\n| sort -Connections",
+          "layout": {
+            "h": 20,
+            "w": 60,
+            "x": 0,
+            "y": 67
+          },
+          "showBarsColumn": "true"
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    },
+    {
+      "tabName": "Restricted Geographies",
+      "filters": [
+        {
+          "facet": "site.name",
+          "name": "Site"
+        },
+        {
+          "facet": "endpoint.name",
+          "name": "Endpoint"
+        },
+        {
+          "facet": "endpoint.os",
+          "name": "OS"
+        },
+        {
+          "facet": "event.network.direction",
+          "name": "Direction"
+        },
+        {
+          "facet": "event.network.protocolName",
+          "name": "Protocol"
+        },
+        {
+          "facet": "src.process.name",
+          "name": "Process"
+        }
+      ],
+      "graphs": [
+        {
+          "title": "Monitored Geography Events",
+          "description": "Total IP Connect events involving the V2 restricted/elevated-risk geography set.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"IP Connect\" AND ((event.network.direction == \"OUTGOING\" AND geo_ip_country(dst.ip.address) contains:anycase(\"russia\", \"china\", \"iran\", \"north korea\", \"korea, democratic people's republic of\", \"dprk\", \"belarus\", \"india\", \"pakistan\", \"vietnam\")) OR (event.network.direction == \"INCOMING\" AND geo_ip_country(src.ip.address) contains:anycase(\"russia\", \"china\", \"iran\", \"north korea\", \"korea, democratic people's republic of\", \"dprk\", \"belarus\", \"india\", \"pakistan\", \"vietnam\")))) | group Connections = count()",
+          "layout": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Endpoints Involved",
+          "description": "Distinct endpoints involved in monitored-geography network activity.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"IP Connect\" AND ((event.network.direction == \"OUTGOING\" AND geo_ip_country(dst.ip.address) contains:anycase(\"russia\", \"china\", \"iran\", \"north korea\", \"korea, democratic people's republic of\", \"dprk\", \"belarus\", \"india\", \"pakistan\", \"vietnam\")) OR (event.network.direction == \"INCOMING\" AND geo_ip_country(src.ip.address) contains:anycase(\"russia\", \"china\", \"iran\", \"north korea\", \"korea, democratic people's republic of\", \"dprk\", \"belarus\", \"india\", \"pakistan\", \"vietnam\")))) | group Endpoints = estimate_distinct(endpoint.name)",
+          "layout": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Unique Remote IPs",
+          "description": "Distinct remote IPs geolocated to restricted/elevated-risk countries.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction in (\"OUTGOING\",\"INCOMING\")) | let RemoteIP = event.network.direction == \"OUTGOING\" ? dst.ip.address : src.ip.address | let RemoteCountry = geo_ip_country(RemoteIP) | filter RemoteCountry contains:anycase(\"russia\", \"china\", \"iran\", \"north korea\", \"korea, democratic people's republic of\", \"dprk\", \"belarus\", \"india\", \"pakistan\", \"vietnam\") | group RemoteIPs = estimate_distinct(RemoteIP)",
+          "layout": {
+            "h": 7,
+            "w": 12,
+            "x": 24,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Outbound Monitored",
+          "description": "Outbound connections to restricted/elevated-risk countries.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"OUTGOING\" AND geo_ip_country(dst.ip.address) contains:anycase(\"russia\", \"china\", \"iran\", \"north korea\", \"korea, democratic people's republic of\", \"dprk\", \"belarus\", \"india\", \"pakistan\", \"vietnam\")) | group Connections = count()",
+          "layout": {
+            "h": 7,
+            "w": 12,
+            "x": 36,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Inbound Monitored",
+          "description": "Incoming connections from restricted/elevated-risk countries.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"INCOMING\" AND geo_ip_country(src.ip.address) contains:anycase(\"russia\", \"china\", \"iran\", \"north korea\", \"korea, democratic people's republic of\", \"dprk\", \"belarus\", \"india\", \"pakistan\", \"vietnam\")) | group Connections = count()",
+          "layout": {
+            "h": 7,
+            "w": 12,
+            "x": 48,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Monitored Geography Activity Over Time",
+          "description": "Restricted/elevated-risk geography connection trend by network direction. V2 uses Power Query so geo_ip_country() is evaluated in the query pipeline rather than an unsupported regular-search plot filter.",
+          "graphStyle": "line",
+          "layout": {
+            "h": 10,
+            "w": 60,
+            "x": 0,
+            "y": 7
+          },
+          "lineSmoothing": "straightLines",
+          "plotNulls": "gaps",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction in (\"OUTGOING\",\"INCOMING\"))\n| let RemoteIP = event.network.direction == \"OUTGOING\" ? dst.ip.address : src.ip.address\n| let RemoteCountry = geo_ip_country(RemoteIP)\n| filter RemoteCountry contains:anycase(\"russia\", \"china\", \"iran\", \"north korea\", \"korea, democratic people's republic of\", \"dprk\", \"belarus\", \"india\", \"pakistan\", \"vietnam\")\n| group Connections = count() by timestamp = timebucket('1 hour'), Direction = event.network.direction\n| transpose Direction on timestamp",
+          "xAxis": "time",
+          "yScale": "linear"
+        },
+        {
+          "title": "Restricted / Elevated-Risk Countries",
+          "description": "Distribution of traffic involving the V2 restricted/elevated-risk geography set.",
+          "graphStyle": "donut",
+          "dataLabelType": "PERCENTAGE",
+          "maxPieSlices": 8,
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction in (\"OUTGOING\",\"INCOMING\")) | let RemoteCountry = event.network.direction == \"OUTGOING\" ? geo_ip_country(dst.ip.address) : geo_ip_country(src.ip.address) | filter RemoteCountry contains:anycase(\"russia\", \"china\", \"iran\", \"north korea\", \"korea, democratic people's republic of\", \"dprk\", \"belarus\", \"india\", \"pakistan\", \"vietnam\") | group Connections = count() by RemoteCountry | sort -Connections",
+          "layout": {
+            "h": 14,
+            "w": 20,
+            "x": 0,
+            "y": 17
+          }
+        },
+        {
+          "title": "Top Endpoints — Monitored Geographies",
+          "description": "Endpoints with the highest volume of connections involving restricted/elevated-risk countries.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction in (\"OUTGOING\",\"INCOMING\")) | let RemoteCountry = event.network.direction == \"OUTGOING\" ? geo_ip_country(dst.ip.address) : geo_ip_country(src.ip.address) | filter RemoteCountry contains:anycase(\"russia\", \"china\", \"iran\", \"north korea\", \"korea, democratic people's republic of\", \"dprk\", \"belarus\", \"india\", \"pakistan\", \"vietnam\") | group Connections = count(), Countries = array_agg_distinct(RemoteCountry) by endpoint.name, endpoint.os, site.name | let CountryList = array_to_string(Countries, \", \") | columns endpoint.name, endpoint.os, site.name, CountryList, Connections | sort -Connections | limit 25",
+          "layout": {
+            "h": 14,
+            "w": 20,
+            "x": 20,
+            "y": 17
+          }
+        },
+        {
+          "title": "Top Processes — Monitored Geographies",
+          "description": "Processes associated with the most monitored-geography network events.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction in (\"OUTGOING\",\"INCOMING\")) | let RemoteCountry = event.network.direction == \"OUTGOING\" ? geo_ip_country(dst.ip.address) : geo_ip_country(src.ip.address) | filter RemoteCountry contains:anycase(\"russia\", \"china\", \"iran\", \"north korea\", \"korea, democratic people's republic of\", \"dprk\", \"belarus\", \"india\", \"pakistan\", \"vietnam\") | group Connections = count(), Endpoints = estimate_distinct(endpoint.name), Countries = array_agg_distinct(RemoteCountry) by src.process.name, src.process.publisher | let CountryList = array_to_string(Countries, \", \") | columns src.process.name, src.process.publisher, Endpoints, CountryList, Connections | sort -Connections | limit 25",
+          "layout": {
+            "h": 14,
+            "w": 20,
+            "x": 40,
+            "y": 17
+          }
+        },
+        {
+          "title": "Security-Sensitive Ports — Monitored Geographies",
+          "description": "Connections involving restricted/elevated-risk countries and ports commonly associated with remote administration, lateral movement, databases, or management services.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND dst.port.number in (22,23,135,137,138,139,445,3389,5900,5901,5902,5903,5985,5986,1433,1434,1521,3306,5432,6379,27017,9200,9300) AND event.network.direction in (\"OUTGOING\",\"INCOMING\")) | let RemoteIP = event.network.direction == \"OUTGOING\" ? dst.ip.address : src.ip.address | let RemoteCountry = geo_ip_country(RemoteIP) | filter RemoteCountry contains:anycase(\"russia\", \"china\", \"iran\", \"north korea\", \"korea, democratic people's republic of\", \"dprk\", \"belarus\", \"india\", \"pakistan\", \"vietnam\") | group Connections = count(), Endpoints = estimate_distinct(endpoint.name), RemoteIPs = estimate_distinct(RemoteIP) by RemoteCountry, dst.port.number, event.network.protocolName, event.network.direction | sort -Connections | limit 50",
+          "layout": {
+            "h": 15,
+            "w": 30,
+            "x": 0,
+            "y": 31
+          }
+        },
+        {
+          "title": "Top Remote IPs — Monitored Geographies",
+          "description": "Most active remote IPs geolocated to restricted/elevated-risk countries.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction in (\"OUTGOING\",\"INCOMING\")) | let RemoteIP = event.network.direction == \"OUTGOING\" ? dst.ip.address : src.ip.address | let RemoteCountry = geo_ip_country(RemoteIP) | filter RemoteCountry contains:anycase(\"russia\", \"china\", \"iran\", \"north korea\", \"korea, democratic people's republic of\", \"dprk\", \"belarus\", \"india\", \"pakistan\", \"vietnam\") | group Connections = count(), Endpoints = estimate_distinct(endpoint.name), Ports = array_agg_distinct(dst.port.number), Processes = array_agg_distinct(src.process.name) by RemoteCountry, RemoteIP, event.network.direction | let PortList = array_to_string(Ports, \", \") | let ProcessList = array_to_string(Processes, \", \") | columns RemoteCountry, RemoteIP, event.network.direction, Endpoints, PortList, ProcessList, Connections | sort -Connections | limit 50",
+          "layout": {
+            "h": 15,
+            "w": 30,
+            "x": 30,
+            "y": 31
+          }
+        },
+        {
+          "title": "Analytic Priority — Geo + Port + Process",
+          "description": "V2 analyst-priority model: +50 Tier 1 geography, +35 Tier 2 geography, +30 sensitive port, +20 script interpreter/LOLBin. This is an analyst-priority score, not a SentinelOne threat score.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction in (\"OUTGOING\",\"INCOMING\"))\n| let RemoteIP = event.network.direction == \"OUTGOING\" ? dst.ip.address : src.ip.address\n| let RemoteCountry = geo_ip_country(RemoteIP)\n| let GeoTier = RemoteCountry contains:anycase(\"russia\", \"china\", \"iran\", \"north korea\", \"korea, democratic people's republic of\", \"dprk\", \"belarus\") ? \"Tier 1\" : RemoteCountry contains:anycase(\"india\", \"pakistan\", \"vietnam\") ? \"Tier 2\" : \"Other\"\n| let GeoRisk = GeoTier == \"Tier 1\" ? 50 : GeoTier == \"Tier 2\" ? 35 : 0\n| let PortRisk = dst.port.number in (22,23,135,137,138,139,445,3389,5900,5901,5902,5903,5985,5986,1433,1434,1521,3306,5432,6379,27017,9200,9300) ? 30 : 0\n| let ProcessRisk = src.process.name in:anycase('powershell.exe','pwsh.exe','cmd.exe','wscript.exe','cscript.exe','mshta.exe','rundll32.exe','regsvr32.exe','python.exe','python3','bash','sh','curl.exe','curl','wget.exe','wget','certutil.exe','bitsadmin.exe') ? 20 : 0\n| let AnalyticScore = GeoRisk + PortRisk + ProcessRisk\n| filter AnalyticScore >= 35\n| let Priority = AnalyticScore >= 80 ? \"Critical Review\" : AnalyticScore >= 60 ? \"High Review\" : \"Medium Review\"\n| columns event.time, site.name, endpoint.name, src.process.user, src.process.name, src.process.publisher, event.network.direction, src.ip.address, src.port.number, dst.ip.address, dst.port.number, event.network.protocolName, event.network.connectionStatus, RemoteCountry, GeoTier, AnalyticScore, Priority\n| sort -AnalyticScore, -event.time\n| limit 250",
+          "layout": {
+            "h": 18,
+            "w": 60,
+            "x": 0,
+            "y": 46
+          }
+        },
+        {
+          "title": "Restricted Geo Flow — Country → Endpoint → Process",
+          "description": "Sankey investigation flow for V2 restricted/elevated-risk countries.",
+          "graphStyle": "sankey",
+          "sankeyColorScheme": "default",
+          "showNodeValues": "true",
+          "colorMatching": "automatic",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction in (\"OUTGOING\",\"INCOMING\")) | let country = event.network.direction == \"OUTGOING\" ? geo_ip_country(dst.ip.address) : geo_ip_country(src.ip.address) | filter country contains:anycase(\"russia\", \"china\", \"iran\", \"north korea\", \"korea, democratic people's republic of\", \"dprk\", \"belarus\", \"india\", \"pakistan\", \"vietnam\") | let host = \"💻 \" + endpoint.name | let proc = src.process.name != null ? \"⚙️ \" + src.process.name : \"⚙️ System/Kernel\" | group c = count() by country, host, proc | sort -c | limit 60 | let link = array(0,1,2).expand() | let source = link == 0 ? \"🚨 Restricted Geographies\" : link == 1 ? country : host | let target = link == 0 ? country : link == 1 ? host : proc | group c = sum(c) by source, target | columns source, target, c",
+          "layout": {
+            "h": 18,
+            "w": 60,
+            "x": 0,
+            "y": 64
+          }
+        },
+        {
+          "title": "Raw Restricted / Elevated-Risk Geography Connections",
+          "description": "Detailed V2 restricted/elevated-risk geography events with analyst geography tier for validation and evidence collection.",
+          "graphStyle": "",
+          "showBarsColumn": "false",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction in (\"OUTGOING\",\"INCOMING\"))\n| let RemoteIP = event.network.direction == \"OUTGOING\" ? dst.ip.address : src.ip.address\n| let RemoteCountry = geo_ip_country(RemoteIP)\n| filter RemoteCountry contains:anycase(\"russia\", \"china\", \"iran\", \"north korea\", \"korea, democratic people's republic of\", \"dprk\", \"belarus\", \"india\", \"pakistan\", \"vietnam\")\n| let GeoTier = RemoteCountry contains:anycase(\"russia\", \"china\", \"iran\", \"north korea\", \"korea, democratic people's republic of\", \"dprk\", \"belarus\") ? \"Tier 1\" : \"Tier 2\"\n| columns event.time, event.id, site.name, endpoint.name, endpoint.os, agent.uuid, src.process.storyline.id, src.process.name, src.process.displayName, src.process.user, src.process.cmdline, src.process.image.path, src.process.publisher, src.ip.address, src.port.number, dst.ip.address, dst.port.number, event.network.direction, event.network.protocolName, event.network.connectionStatus, RemoteCountry, GeoTier\n| sort -event.time\n| limit 1000",
+          "layout": {
+            "h": 20,
+            "w": 60,
+            "x": 0,
+            "y": 82
+          }
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    },
+    {
+      "tabName": "Protocols & Ports",
+      "filters": [
+        {
+          "facet": "site.name",
+          "name": "Site"
+        },
+        {
+          "facet": "endpoint.name",
+          "name": "Endpoint"
+        },
+        {
+          "facet": "endpoint.os",
+          "name": "OS"
+        },
+        {
+          "facet": "event.network.direction",
+          "name": "Direction"
+        },
+        {
+          "facet": "event.network.protocolName",
+          "name": "Protocol"
+        },
+        {
+          "facet": "src.process.name",
+          "name": "Process"
+        }
+      ],
+      "graphs": [
+        {
+          "title": "Protocols by Connection Volume",
+          "description": "Protocol distribution for IP Connect events.",
+          "graphStyle": "pie",
+          "dataLabelType": "PERCENTAGE",
+          "maxPieSlices": 10,
+          "query": "| filter(event.type == \"IP Connect\") | group Connections = count() by event.network.protocolName | sort -Connections",
+          "layout": {
+            "h": 15,
+            "w": 20,
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "title": "Top Outbound Destination Ports",
+          "description": "Most frequently contacted destination ports for outbound connections.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"OUTGOING\") | let DestinationCountry = geo_ip_country(dst.ip.address) | group Connections = count(), RemoteIPs = estimate_distinct(dst.ip.address), Countries = array_agg_distinct(DestinationCountry) by dst.port.number, event.network.protocolName | let CountryList = array_to_string(Countries, \", \") | columns dst.port.number, event.network.protocolName, RemoteIPs, CountryList, Connections | sort -Connections | limit 40",
+          "layout": {
+            "h": 15,
+            "w": 20,
+            "x": 20,
+            "y": 0
+          }
+        },
+        {
+          "title": "Top Inbound Destination Ports",
+          "description": "Most frequently targeted local destination/service ports in incoming IP Connect events.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"INCOMING\") | group Connections = count(), SourceIPs = estimate_distinct(src.ip.address), Endpoints = estimate_distinct(endpoint.name) by dst.port.number, event.network.protocolName | sort -Connections | limit 40",
+          "layout": {
+            "h": 15,
+            "w": 20,
+            "x": 40,
+            "y": 0
+          }
+        },
+        {
+          "title": "Security-Sensitive Service Ports",
+          "description": "Observed connections on remote administration, lateral movement, database, and management ports.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND dst.port.number in (22,23,135,137,138,139,445,3389,5900,5901,5902,5903,5985,5986,1433,1434,1521,3306,5432,6379,27017,9200,9300) AND event.network.direction in (\"OUTGOING\",\"INCOMING\")) | let RemoteIP = event.network.direction == \"OUTGOING\" ? dst.ip.address : src.ip.address | let RemoteCountry = geo_ip_country(RemoteIP) | group Connections = count(), Endpoints = estimate_distinct(endpoint.name), RemoteIPs = estimate_distinct(RemoteIP) by dst.port.number, event.network.protocolName, event.network.direction, RemoteCountry | sort -Connections | limit 100",
+          "layout": {
+            "h": 18,
+            "w": 60,
+            "x": 0,
+            "y": 15
+          }
+        },
+        {
+          "title": "Top Process + Destination Port Pairs",
+          "description": "Processes and destination ports generating the largest volume of network activity.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\") | group Connections = count(), RemoteIPs = estimate_distinct(dst.ip.address), Endpoints = estimate_distinct(endpoint.name) by src.process.name, dst.port.number, event.network.protocolName, event.network.direction | sort -Connections | limit 50",
+          "layout": {
+            "h": 17,
+            "w": 30,
+            "x": 0,
+            "y": 33
+          }
+        },
+        {
+          "title": "Connection Status by Destination Port",
+          "description": "Port-level breakdown of connection status values.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\") | group Connections = count() by dst.port.number, event.network.connectionStatus, event.network.protocolName | sort -Connections | limit 50",
+          "layout": {
+            "h": 17,
+            "w": 30,
+            "x": 30,
+            "y": 33
+          }
+        },
+        {
+          "title": "Sensitive Port Activity Over Time",
+          "description": "Timeline for security-sensitive destination/service ports.",
+          "graphStyle": "line",
+          "plots": [
+            {
+              "filter": "event.type='IP Connect' and dst.port.number in (22,23,135,137,138,139,445,3389,5900,5901,5902,5903,5985,5986,1433,1434,1521,3306,5432,6379,27017,9200,9300)",
+              "label": "Sensitive port events"
+            }
+          ],
+          "layout": {
+            "h": 10,
+            "w": 60,
+            "x": 0,
+            "y": 50
+          },
+          "lineSmoothing": "straightLines",
+          "plotNulls": "gaps"
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    },
+    {
+      "tabName": "Endpoint & Process",
+      "filters": [
+        {
+          "facet": "site.name",
+          "name": "Site"
+        },
+        {
+          "facet": "endpoint.name",
+          "name": "Endpoint"
+        },
+        {
+          "facet": "endpoint.os",
+          "name": "OS"
+        },
+        {
+          "facet": "event.network.direction",
+          "name": "Direction"
+        },
+        {
+          "facet": "event.network.protocolName",
+          "name": "Protocol"
+        },
+        {
+          "facet": "src.process.name",
+          "name": "Process"
+        }
+      ],
+      "graphs": [
+        {
+          "title": "Top Endpoints by Remote Reach",
+          "description": "Endpoints ranked by connection volume and distinct remote IP reach.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"OUTGOING\") | let DestinationCountry = geo_ip_country(dst.ip.address) | group Connections = count(), DistinctRemoteIPs = estimate_distinct(dst.ip.address), DistinctCountries = estimate_distinct(DestinationCountry), Processes = estimate_distinct(src.process.name) by endpoint.name, endpoint.os, site.name | sort -Connections | limit 30",
+          "layout": {
+            "h": 16,
+            "w": 30,
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "title": "Top Network Processes",
+          "description": "Processes producing the most IP Connect events.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\") | group Connections = count(), Endpoints = estimate_distinct(endpoint.name), RemoteIPs = estimate_distinct(dst.ip.address), Ports = array_agg_distinct(dst.port.number) by src.process.name, src.process.publisher | let PortList = array_to_string(Ports, \", \") | columns src.process.name, src.process.publisher, Endpoints, RemoteIPs, PortList, Connections | sort -Connections | limit 30",
+          "layout": {
+            "h": 16,
+            "w": 30,
+            "x": 30,
+            "y": 0
+          }
+        },
+        {
+          "title": "Users Associated with Network Activity",
+          "description": "Users ranked by observed network connection volume.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND src.process.user != null) | group Connections = count(), Endpoints = estimate_distinct(endpoint.name), Processes = estimate_distinct(src.process.name), RemoteIPs = estimate_distinct(dst.ip.address) by src.process.user | sort -Connections | limit 30",
+          "layout": {
+            "h": 15,
+            "w": 30,
+            "x": 0,
+            "y": 16
+          }
+        },
+        {
+          "title": "Script Interpreters & LOLBins with Network Activity",
+          "description": "Network connections associated with command interpreters, scripting engines, download utilities, and commonly abused LOLBins. Context is required; many are legitimate administrative tools.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND src.process.name in:anycase('powershell.exe','pwsh.exe','cmd.exe','wscript.exe','cscript.exe','mshta.exe','rundll32.exe','regsvr32.exe','python.exe','python3','bash','sh','curl.exe','curl','wget.exe','wget','certutil.exe','bitsadmin.exe')) | let DestinationCountry = geo_ip_country(dst.ip.address) | columns event.time, site.name, endpoint.name, src.process.user, src.process.name, src.process.publisher, src.process.cmdline, dst.ip.address, dst.port.number, event.network.protocolName, event.network.connectionStatus, DestinationCountry | sort -event.time | limit 300",
+          "layout": {
+            "h": 15,
+            "w": 30,
+            "x": 30,
+            "y": 16
+          }
+        },
+        {
+          "title": "Endpoint → Process → Destination Country",
+          "description": "Sankey flow showing which endpoint processes communicate with which destination countries.",
+          "graphStyle": "sankey",
+          "sankeyColorScheme": "default",
+          "showNodeValues": "true",
+          "colorMatching": "automatic",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"OUTGOING\") | let country = geo_ip_country(dst.ip.address) | filter !isempty(country) | let host = \"💻 \" + endpoint.name | let proc = src.process.name != null ? \"⚙️ \" + src.process.name : \"⚙️ System/Kernel\" | group c = count() by host, proc, country | sort -c | limit 70 | let link = array(0,1,2).expand() | let source = link == 0 ? \"🧭 Outbound Endpoints\" : link == 1 ? host : proc | let target = link == 0 ? host : link == 1 ? proc : country | group c = sum(c) by source, target | columns source, target, c",
+          "layout": {
+            "h": 18,
+            "w": 60,
+            "x": 0,
+            "y": 31
+          }
+        },
+        {
+          "title": "Process Network Detail",
+          "description": "High-detail process-to-network attribution for investigation.",
+          "graphStyle": "",
+          "showBarsColumn": "false",
+          "query": "| filter(event.type == \"IP Connect\") | let DestinationCountry = geo_ip_country(dst.ip.address) | let SourceCountry = geo_ip_country(src.ip.address) | columns event.time, site.name, endpoint.name, endpoint.os, src.process.storyline.id, src.process.user, src.process.name, src.process.displayName, src.process.publisher, src.process.cmdline, src.process.image.path, src.ip.address, src.port.number, dst.ip.address, dst.port.number, event.network.direction, event.network.protocolName, event.network.connectionStatus, SourceCountry, DestinationCountry | sort -event.time | limit 1000",
+          "layout": {
+            "h": 20,
+            "w": 60,
+            "x": 0,
+            "y": 49
+          }
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    },
+    {
+      "tabName": "Inbound Exposure",
+      "filters": [
+        {
+          "facet": "site.name",
+          "name": "Site"
+        },
+        {
+          "facet": "endpoint.name",
+          "name": "Endpoint"
+        },
+        {
+          "facet": "endpoint.os",
+          "name": "OS"
+        },
+        {
+          "facet": "event.network.direction",
+          "name": "Direction"
+        },
+        {
+          "facet": "event.network.protocolName",
+          "name": "Protocol"
+        },
+        {
+          "facet": "src.process.name",
+          "name": "Process"
+        }
+      ],
+      "graphs": [
+        {
+          "title": "Incoming Connection Events",
+          "description": "Total incoming IP Connect events.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"INCOMING\") | group Connections = count()",
+          "layout": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "External Source Countries",
+          "description": "Distinct geolocated countries associated with inbound source IPs.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"INCOMING\") | let SourceCountry = geo_ip_country(src.ip.address) | filter !isempty(SourceCountry) | group Countries = estimate_distinct(SourceCountry)",
+          "layout": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Distinct Source IPs",
+          "description": "Distinct public/geolocated inbound source IPs.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"INCOMING\") | let SourceCountry = geo_ip_country(src.ip.address) | filter !isempty(SourceCountry) | group SourceIPs = estimate_distinct(src.ip.address)",
+          "layout": {
+            "h": 7,
+            "w": 12,
+            "x": 24,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Endpoints Reached",
+          "description": "Distinct endpoints receiving incoming network events.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"INCOMING\") | group Endpoints = estimate_distinct(endpoint.name)",
+          "layout": {
+            "h": 7,
+            "w": 12,
+            "x": 36,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Sensitive-Port Incoming",
+          "description": "Incoming connections targeting security-sensitive service ports.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"INCOMING\" AND dst.port.number in (22,23,135,137,138,139,445,3389,5900,5901,5902,5903,5985,5986,1433,1434,1521,3306,5432,6379,27017,9200,9300)) | group Connections = count()",
+          "layout": {
+            "h": 7,
+            "w": 12,
+            "x": 48,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Top Inbound Source Countries",
+          "description": "Countries generating the most incoming IP Connect events.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"INCOMING\") | let SourceCountry = geo_ip_country(src.ip.address) | filter !isempty(SourceCountry) | group Connections = count(), SourceIPs = estimate_distinct(src.ip.address), Endpoints = estimate_distinct(endpoint.name), Ports = array_agg_distinct(dst.port.number) by SourceCountry | let PortList = array_to_string(Ports, \", \") | columns SourceCountry, SourceIPs, Endpoints, PortList, Connections | sort -Connections | limit 30",
+          "layout": {
+            "h": 15,
+            "w": 30,
+            "x": 0,
+            "y": 7
+          }
+        },
+        {
+          "title": "Top Inbound Source IPs",
+          "description": "Remote source IPs ranked by incoming event volume.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"INCOMING\") | let SourceCountry = geo_ip_country(src.ip.address) | filter !isempty(SourceCountry) | group Connections = count(), Endpoints = estimate_distinct(endpoint.name), Ports = array_agg_distinct(dst.port.number) by SourceCountry, src.ip.address | let PortList = array_to_string(Ports, \", \") | columns SourceCountry, src.ip.address, Endpoints, PortList, Connections | sort -Connections | limit 50",
+          "layout": {
+            "h": 15,
+            "w": 30,
+            "x": 30,
+            "y": 7
+          }
+        },
+        {
+          "title": "Top Targeted Local Ports",
+          "description": "Destination/service ports observed in incoming connections.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"INCOMING\") | let SourceCountry = geo_ip_country(src.ip.address) | group Connections = count(), SourceIPs = estimate_distinct(src.ip.address), Countries = estimate_distinct(SourceCountry), Endpoints = estimate_distinct(endpoint.name) by dst.port.number, event.network.protocolName | sort -Connections | limit 50",
+          "layout": {
+            "h": 16,
+            "w": 30,
+            "x": 0,
+            "y": 22
+          }
+        },
+        {
+          "title": "Top Targeted Endpoints",
+          "description": "Endpoints receiving the most incoming IP Connect events.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"INCOMING\") | let SourceCountry = geo_ip_country(src.ip.address) | group Connections = count(), SourceIPs = estimate_distinct(src.ip.address), Countries = estimate_distinct(SourceCountry), Ports = array_agg_distinct(dst.port.number) by endpoint.name, endpoint.os, site.name | let PortList = array_to_string(Ports, \", \") | columns endpoint.name, endpoint.os, site.name, SourceIPs, Countries, PortList, Connections | sort -Connections | limit 40",
+          "layout": {
+            "h": 16,
+            "w": 30,
+            "x": 30,
+            "y": 22
+          }
+        },
+        {
+          "title": "Inbound Flow — Country → Source IP → Endpoint",
+          "description": "Sankey view of external source geography, source IP, and targeted endpoint.",
+          "graphStyle": "sankey",
+          "sankeyColorScheme": "default",
+          "showNodeValues": "true",
+          "colorMatching": "automatic",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"INCOMING\") | let country = geo_ip_country(src.ip.address) | filter !isempty(country) | let remoteip = \"🌐 \" + src.ip.address | let host = \"💻 \" + endpoint.name | group c = count() by country, remoteip, host | sort -c | limit 70 | let link = array(0,1,2).expand() | let source = link == 0 ? \"📡 Incoming Internet\" : link == 1 ? country : remoteip | let target = link == 0 ? country : link == 1 ? remoteip : host | group c = sum(c) by source, target | columns source, target, c",
+          "layout": {
+            "h": 18,
+            "w": 60,
+            "x": 0,
+            "y": 38
+          }
+        },
+        {
+          "title": "Raw Incoming Connection Events",
+          "description": "Detailed incoming connection events with geolocation and local process context.",
+          "graphStyle": "",
+          "showBarsColumn": "false",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"INCOMING\") | let SourceCountry = geo_ip_country(src.ip.address) | columns event.time, event.id, site.name, endpoint.name, endpoint.os, agent.uuid, src.process.storyline.id, src.process.name, src.process.displayName, src.process.user, src.process.cmdline, src.process.image.path, src.process.publisher, src.ip.address, src.port.number, dst.ip.address, dst.port.number, event.network.protocolName, event.network.connectionStatus, SourceCountry | sort -event.time | limit 1000",
+          "layout": {
+            "h": 20,
+            "w": 60,
+            "x": 0,
+            "y": 56
+          }
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    },
+    {
+      "tabName": "Outbound Communications",
+      "filters": [
+        {
+          "facet": "site.name",
+          "name": "Site"
+        },
+        {
+          "facet": "endpoint.name",
+          "name": "Endpoint"
+        },
+        {
+          "facet": "endpoint.os",
+          "name": "OS"
+        },
+        {
+          "facet": "event.network.direction",
+          "name": "Direction"
+        },
+        {
+          "facet": "event.network.protocolName",
+          "name": "Protocol"
+        },
+        {
+          "facet": "src.process.name",
+          "name": "Process"
+        }
+      ],
+      "graphs": [
+        {
+          "title": "Outgoing Connection Events",
+          "description": "Total outgoing IP Connect events.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"OUTGOING\") | group Connections = count()",
+          "layout": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Destination Countries",
+          "description": "Distinct geolocated destination countries.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"OUTGOING\") | let DestinationCountry = geo_ip_country(dst.ip.address) | filter !isempty(DestinationCountry) | group Countries = estimate_distinct(DestinationCountry)",
+          "layout": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Distinct Destination IPs",
+          "description": "Distinct public/geolocated outbound destination IPs.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"OUTGOING\") | let DestinationCountry = geo_ip_country(dst.ip.address) | filter !isempty(DestinationCountry) | group DestinationIPs = estimate_distinct(dst.ip.address)",
+          "layout": {
+            "h": 7,
+            "w": 12,
+            "x": 24,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Network Processes",
+          "description": "Distinct source processes associated with outbound network activity.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"OUTGOING\") | group Processes = estimate_distinct(src.process.name)",
+          "layout": {
+            "h": 7,
+            "w": 12,
+            "x": 36,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Users Observed",
+          "description": "Distinct process users associated with outbound IP Connect events.",
+          "graphStyle": "number",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"OUTGOING\" AND src.process.user != null) | group Users = estimate_distinct(src.process.user)",
+          "layout": {
+            "h": 7,
+            "w": 12,
+            "x": 48,
+            "y": 0
+          },
+          "sparklineConfig": {
+            "enabled": false
+          },
+          "trendConfig": {
+            "enabled": true,
+            "indicators": {
+              "arrow": {
+                "enabled": false
+              },
+              "number": {
+                "calculationType": "ABSOLUTE",
+                "enabled": true
+              },
+              "upwardsMeaning": "NEUTRAL"
+            },
+            "upwardsMeaning": "NEUTRAL"
+          }
+        },
+        {
+          "title": "Top Destination Countries",
+          "description": "Countries receiving the most outbound connections.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"OUTGOING\") | let DestinationCountry = geo_ip_country(dst.ip.address) | filter !isempty(DestinationCountry) | group Connections = count(), DestinationIPs = estimate_distinct(dst.ip.address), Endpoints = estimate_distinct(endpoint.name), Processes = estimate_distinct(src.process.name) by DestinationCountry | sort -Connections | limit 30",
+          "layout": {
+            "h": 15,
+            "w": 30,
+            "x": 0,
+            "y": 7
+          }
+        },
+        {
+          "title": "Top Destination IPs",
+          "description": "Most active outbound destination IPs with country and service ports.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"OUTGOING\") | let DestinationCountry = geo_ip_country(dst.ip.address) | filter !isempty(DestinationCountry) | group Connections = count(), Endpoints = estimate_distinct(endpoint.name), Ports = array_agg_distinct(dst.port.number), Processes = array_agg_distinct(src.process.name) by DestinationCountry, dst.ip.address | let PortList = array_to_string(Ports, \", \") | let ProcessList = array_to_string(Processes, \", \") | columns DestinationCountry, dst.ip.address, Endpoints, PortList, ProcessList, Connections | sort -Connections | limit 50",
+          "layout": {
+            "h": 15,
+            "w": 30,
+            "x": 30,
+            "y": 7
+          }
+        },
+        {
+          "title": "Top Outbound Processes",
+          "description": "Processes generating the most outbound connections.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"OUTGOING\") | let DestinationCountry = geo_ip_country(dst.ip.address) | group Connections = count(), Endpoints = estimate_distinct(endpoint.name), DestinationIPs = estimate_distinct(dst.ip.address), Countries = array_agg_distinct(DestinationCountry) by src.process.name, src.process.publisher | let CountryList = array_to_string(Countries, \", \") | columns src.process.name, src.process.publisher, Endpoints, DestinationIPs, CountryList, Connections | sort -Connections | limit 40",
+          "layout": {
+            "h": 16,
+            "w": 30,
+            "x": 0,
+            "y": 22
+          }
+        },
+        {
+          "title": "Top Outbound Users",
+          "description": "Users associated with the highest outbound connection volume.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"OUTGOING\" AND src.process.user != null) | group Connections = count(), Endpoints = estimate_distinct(endpoint.name), Processes = estimate_distinct(src.process.name), DestinationIPs = estimate_distinct(dst.ip.address) by src.process.user | sort -Connections | limit 40",
+          "layout": {
+            "h": 16,
+            "w": 30,
+            "x": 30,
+            "y": 22
+          }
+        },
+        {
+          "title": "Outbound Flow — Endpoint → Process → Country",
+          "description": "High-level outbound communication flow for rapid SOC triage.",
+          "graphStyle": "sankey",
+          "sankeyColorScheme": "default",
+          "showNodeValues": "true",
+          "colorMatching": "automatic",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"OUTGOING\") | let country = geo_ip_country(dst.ip.address) | filter !isempty(country) | let host = \"💻 \" + endpoint.name | let proc = src.process.name != null ? \"⚙️ \" + src.process.name : \"⚙️ System/Kernel\" | group c = count() by host, proc, country | sort -c | limit 70 | let link = array(0,1,2).expand() | let source = link == 0 ? \"🚀 Outbound Network\" : link == 1 ? host : proc | let target = link == 0 ? host : link == 1 ? proc : country | group c = sum(c) by source, target | columns source, target, c",
+          "layout": {
+            "h": 18,
+            "w": 60,
+            "x": 0,
+            "y": 38
+          }
+        },
+        {
+          "title": "Raw Outgoing Connection Events",
+          "description": "Detailed outbound connection events with destination geolocation.",
+          "graphStyle": "",
+          "showBarsColumn": "false",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction == \"OUTGOING\") | let DestinationCountry = geo_ip_country(dst.ip.address) | columns event.time, event.id, site.name, endpoint.name, endpoint.os, agent.uuid, src.process.storyline.id, src.process.name, src.process.displayName, src.process.user, src.process.cmdline, src.process.image.path, src.process.publisher, src.ip.address, src.port.number, dst.ip.address, dst.port.number, event.network.protocolName, event.network.connectionStatus, DestinationCountry | sort -event.time | limit 1000",
+          "layout": {
+            "h": 20,
+            "w": 60,
+            "x": 0,
+            "y": 56
+          }
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    },
+    {
+      "tabName": "Investigation",
+      "filters": [
+        {
+          "facet": "site.name",
+          "name": "Site"
+        },
+        {
+          "facet": "endpoint.name",
+          "name": "Endpoint"
+        },
+        {
+          "facet": "endpoint.os",
+          "name": "OS"
+        },
+        {
+          "facet": "event.network.direction",
+          "name": "Direction"
+        },
+        {
+          "facet": "event.network.protocolName",
+          "name": "Protocol"
+        },
+        {
+          "facet": "src.process.name",
+          "name": "Process"
+        }
+      ],
+      "graphs": [
+        {
+          "title": "Unified Network Investigation Table",
+          "description": "Unified incoming/outgoing IP Connect table with computed remote IP and country for investigation.",
+          "graphStyle": "",
+          "showBarsColumn": "false",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction in (\"OUTGOING\",\"INCOMING\")) | let RemoteIP = event.network.direction == \"OUTGOING\" ? dst.ip.address : src.ip.address | let RemoteCountry = geo_ip_country(RemoteIP) | columns event.time, event.id, event.type, site.id, site.name, endpoint.name, endpoint.os, agent.uuid, src.process.storyline.id, src.process.name, src.process.displayName, src.process.user, src.process.uid, src.process.cmdline, src.process.image.path, src.process.publisher, src.ip.address, src.port.number, dst.ip.address, dst.port.number, event.network.direction, event.network.protocolName, event.network.connectionStatus, RemoteIP, RemoteCountry | sort -event.time | limit 1000",
+          "layout": {
+            "h": 24,
+            "w": 60,
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "title": "Country + Endpoint + Process Pivot",
+          "description": "Aggregated pivot for quickly identifying high-volume country/endpoint/process combinations.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND event.network.direction in (\"OUTGOING\",\"INCOMING\")) | let RemoteIP = event.network.direction == \"OUTGOING\" ? dst.ip.address : src.ip.address | let RemoteCountry = geo_ip_country(RemoteIP) | filter !isempty(RemoteCountry) | group Connections = count(), RemoteIPs = estimate_distinct(RemoteIP), Ports = array_agg_distinct(dst.port.number) by RemoteCountry, endpoint.name, src.process.name, event.network.direction | let PortList = array_to_string(Ports, \", \") | columns RemoteCountry, endpoint.name, src.process.name, event.network.direction, RemoteIPs, PortList, Connections | sort -Connections | limit 200",
+          "layout": {
+            "h": 18,
+            "w": 60,
+            "x": 0,
+            "y": 24
+          }
+        },
+        {
+          "title": "Storyline-Centric Network Pivot",
+          "description": "Ranks Storylines by network activity, remote IPs, countries, and ports for investigation.",
+          "graphStyle": "",
+          "showBarsColumn": "true",
+          "query": "| filter(event.type == \"IP Connect\" AND src.process.storyline.id != null) | let DestinationCountry = geo_ip_country(dst.ip.address) | group Connections = count(), RemoteIPs = estimate_distinct(dst.ip.address), Countries = array_agg_distinct(DestinationCountry), Ports = array_agg_distinct(dst.port.number) by endpoint.name, src.process.storyline.id, src.process.name, src.process.user | let CountryList = array_to_string(Countries, \", \") | let PortList = array_to_string(Ports, \", \") | columns endpoint.name, src.process.storyline.id, src.process.name, src.process.user, RemoteIPs, CountryList, PortList, Connections | sort -Connections | limit 100",
+          "layout": {
+            "h": 18,
+            "w": 60,
+            "x": 0,
+            "y": 42
+          }
+        }
+      ],
+      "options": {
+        "layout": {
+          "locked": 1
+        }
+      }
+    }
+  ]
+}
