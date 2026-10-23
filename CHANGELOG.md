@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Await SentinelOne maintainer alignment on the proposed community contribution and collect tenant validation evidence.
+- Track the submitted scope proposal in [Sentinel-One/ai-siem #136](https://github.com/Sentinel-One/ai-siem/issues/136).
 
 ## 1.0.0 — 2026-10-23
 

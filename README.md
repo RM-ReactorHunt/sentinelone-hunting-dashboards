@@ -54,6 +54,8 @@ The intended upstream is [Sentinel-One/ai-siem](https://github.com/Sentinel-One/
 
 Its [contribution guide](https://github.com/Sentinel-One/ai-siem/blob/main/CONTRIBUTING.md) asks contributors to open an issue before proposing multiple components and to keep PRs focused. The initial step is a scope proposal, followed by focused dashboard PRs after maintainer alignment. No upstream approval is implied by this release.
 
+**Proposal submitted:** [Sentinel-One/ai-siem #136](https://github.com/Sentinel-One/ai-siem/issues/136). Maintainer alignment is pending; no upstream PR or merge is claimed. The proposed first component is Authentication Threat Intelligence.
+
 ## Feedback and collaboration
 
 Open an issue with the dashboard name, console version, affected panel, sanitized query error, and reproduction steps. Do not post customer data, tenant identifiers, credentials, or unredacted console screenshots.
